@@ -65,10 +65,36 @@ export function guessAndVote(
   return next
 }
 
-export function ask(state: GameState, by: string): GameState {
-  return apply(
-    state,
-    { type: "askQuestion", by, question: "Am I alive?" },
-    { type: "questionAnswered", by },
-  )
+/** Room in the lobby with voice-mode questions. */
+export function voiceLobby(count: number): GameState {
+  return gameReducer(lobby(count), {
+    type: "updateSettings",
+    by: "a",
+    settings: { questionMode: "voice" },
+  })
+}
+
+/** `by` asks a question; in type mode everyone else answers it (default "yes"). */
+export function ask(
+  state: GameState,
+  by: string,
+  answers: Record<string, "yes" | "no"> = {},
+): GameState {
+  let next = gameReducer(state, {
+    type: "askQuestion",
+    by,
+    question: "Am I alive?",
+  })
+  if (state.settings.questionMode === "voice") {
+    return gameReducer(next, { type: "questionAnswered", by })
+  }
+  for (const id of next.round!.turnOrder) {
+    if (id === by) continue
+    next = gameReducer(next, {
+      type: "answerQuestion",
+      by: id,
+      answer: answers[id] ?? "yes",
+    })
+  }
+  return next
 }

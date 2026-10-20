@@ -35,6 +35,9 @@ Always check current docs and package versions before installing anything. Do no
 
 - **Turn-based**, in a fixed player order.
 - **On your turn** you either ask the group a question or make a guess about your own card.
+- **Questions have two modes (host picks in the lobby):**
+  - **Type** (default): the asker types a yes/no question and every other player, including solved players, taps Yes / No. Majority decides; a tie shows "Unsure". The result is shown to everyone and the turn moves on automatically.
+  - **Voice**: the asker asks out loud, the group answers out loud, and the asker taps End turn.
 - **Guesses are confirmed by the group.** Every player except the guesser taps Correct / Not yet, **including players who have already solved**. Majority decides. Ties count as "not yet".
 - **Correct guess:** the card is revealed to its owner, the player is marked solved, and they no longer take turns for the rest of the round. Others keep playing.
 - **Turn passing (default, adjustable):** the turn passes after a question is answered or after a wrong guess. Solved players are skipped.

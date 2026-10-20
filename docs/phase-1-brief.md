@@ -6,6 +6,7 @@ Read the project overview first. This brief covers only Phase 0 (setup) and Phas
 
 - Turn-based. Players take turns in a fixed order.
 - On your turn you either ask the group a question, or make a guess about your own card.
+- Question mode is a host setting. Type mode (default): the asker types the question, every other player (solved or not) taps Yes / No, majority wins, a tie shows "Unsure", then the turn moves on. Voice mode: the group answers out loud and the asker taps End turn.
 - Guesses are confirmed by the group. Every player except the guesser taps Correct / Not yet, including players who have already solved. Majority decides; ties count as "not yet".
 - Correct guess: the card is revealed to its owner, the player is marked solved, and they no longer take turns for the rest of the round. Others keep playing.
 - Turn passing (default, adjustable): the turn passes after a question is answered or a wrong guess. A solved player is skipped.

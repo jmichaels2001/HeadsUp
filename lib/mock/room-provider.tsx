@@ -17,6 +17,7 @@ import {
   getViewerState,
   isRoomFull,
   MAX_PLAYERS,
+  type Answer,
   type GameAction,
   type GameSettings,
   type GameState,
@@ -50,7 +51,8 @@ interface Stored {
   orientations: Record<PlayerId, VideoOrientation>
 }
 
-const STORAGE_KEY = "headbands:mock-room"
+// Bump the version when the stored GameState shape changes.
+const STORAGE_KEY = "headbands:mock-room:v2"
 const EMPTY: Stored = { game: null, viewerId: null, orientations: {} }
 
 export interface RoomContextValue {
@@ -69,6 +71,7 @@ export interface RoomContextValue {
     updateSettings: (settings: Partial<GameSettings>) => void
     startRound: () => void
     askQuestion: (question: string) => void
+    answerQuestion: (answer: Answer) => void
     questionAnswered: () => void
     makeGuess: (text: string) => void
     castVote: (vote: Vote) => void
@@ -83,6 +86,7 @@ export interface RoomContextValue {
     addMockPlayer: () => void
     removePlayer: (playerId: PlayerId) => void
     fillVotes: (vote: Vote) => void
+    fillAnswers: (answer: Answer) => void
     setOverlay: (overlay: DevOverlay) => void
     toggleOrientation: (playerId: PlayerId) => void
     reset: () => void
@@ -199,6 +203,8 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "startRound", by, seed: randomSeed() }),
         askQuestion: (question) =>
           dispatch({ type: "askQuestion", by, question }),
+        answerQuestion: (answer) =>
+          dispatch({ type: "answerQuestion", by, answer }),
         questionAnswered: () => dispatch({ type: "questionAnswered", by }),
         makeGuess: (text) => dispatch({ type: "makeGuess", by, text }),
         castVote: (vote) => dispatch({ type: "castVote", by, vote }),
@@ -270,6 +276,27 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
             )
             const game = voters.reduce(
               (g, id) => gameReducer(g, { type: "castVote", by: id, vote }),
+              s.game,
+            )
+            return { ...s, game }
+          })
+        },
+        fillAnswers: (answer) => {
+          setStored((s) => {
+            const round = s.game?.round
+            const turn = round?.turn
+            if (!s.game || !round || turn?.stage.kind !== "asking") return s
+            const stage = turn.stage
+            // Everyone except the asker and the current viewer.
+            const answerers = round.turnOrder.filter(
+              (id) =>
+                id !== turn.activePlayerId &&
+                id !== s.viewerId &&
+                !(id in stage.answers),
+            )
+            const game = answerers.reduce(
+              (g, id) =>
+                gameReducer(g, { type: "answerQuestion", by: id, answer }),
               s.game,
             )
             return { ...s, game }

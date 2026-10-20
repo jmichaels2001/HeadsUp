@@ -17,14 +17,15 @@ export function PlayerTile({
   colorIndex,
   videoSlot,
   cardSize = "md",
-  votingInProgress = false,
+  pendingVote = null,
   className,
 }: {
   player: ViewerPlayer
   colorIndex: number
   videoSlot: ReactNode
   cardSize?: CardSize
-  votingInProgress?: boolean
+  /** A group vote in progress: on a guess, or on a typed question. */
+  pendingVote?: "guess" | "question" | null
   className?: string
 }) {
   const solved = player.status === "solved"
@@ -68,26 +69,27 @@ export function PlayerTile({
             {player.isYou ? "Your turn" : "Their turn"}
           </span>
         )}
-        {votingInProgress &&
-          !player.isGuesser &&
-          player.status !== "waiting" && (
-            <span
-              className={cn(
-                "absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border-2 border-ink px-2 py-0.5 text-xs font-bold",
-                player.hasVoted
-                  ? "bg-card text-ink"
-                  : "bg-muted text-muted-foreground",
-              )}
-            >
-              {player.hasVoted ? (
-                <>
-                  <Check className="size-3.5" aria-hidden /> Voted
-                </>
-              ) : (
-                "Voting…"
-              )}
-            </span>
-          )}
+        {pendingVote && !player.isActive && player.status !== "waiting" && (
+          <span
+            className={cn(
+              "absolute top-2 right-2 inline-flex items-center gap-1 rounded-full border-2 border-ink px-2 py-0.5 text-xs font-bold",
+              player.hasVoted
+                ? "bg-card text-ink"
+                : "bg-muted text-muted-foreground",
+            )}
+          >
+            {player.hasVoted ? (
+              <>
+                <Check className="size-3.5" aria-hidden />{" "}
+                {pendingVote === "guess" ? "Voted" : "Answered"}
+              </>
+            ) : pendingVote === "guess" ? (
+              "Voting…"
+            ) : (
+              "Answering…"
+            )}
+          </span>
+        )}
         <MediaIndicators
           media={player.media}
           className="absolute right-2 bottom-2"

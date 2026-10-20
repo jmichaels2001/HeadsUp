@@ -1,11 +1,19 @@
-import { getStartBlocker, tallyVotes, type StartBlocker } from "./selectors"
+import {
+  getStartBlocker,
+  tallyAnswers,
+  tallyVotes,
+  type StartBlocker,
+} from "./selectors"
 import type {
+  Answer,
   Card,
   GamePhase,
   GameState,
   GameSettings,
   MediaState,
   PlayerId,
+  QuestionMode,
+  TurnResult,
   Vote,
 } from "./types"
 
@@ -26,7 +34,7 @@ export interface ViewerPlayer {
   card: Card | null
   /** True only for the viewer's own card while it is still secret. */
   cardHidden: boolean
-  /** During a vote: whether this player has voted (not how). */
+  /** During a guess vote or typed question: whether they've voted (not how). */
   hasVoted: boolean
   isGuesser: boolean
 }
@@ -41,9 +49,21 @@ export interface ViewerGuess {
   canVote: boolean
 }
 
+export interface ViewerQuestion {
+  mode: QuestionMode
+  text: string
+  /** Type mode only; zero in voice mode. */
+  answeredCount: number
+  eligibleCount: number
+  /** The viewer's own answer, if any. */
+  yourAnswer: Answer | null
+  /** True when the viewer should answer Yes / No (type mode, not the asker). */
+  canAnswer: boolean
+}
+
 export type ViewerTurn =
   | { kind: "choosing"; activePlayerId: PlayerId }
-  | { kind: "asking"; activePlayerId: PlayerId; question: string }
+  | { kind: "asking"; activePlayerId: PlayerId; question: ViewerQuestion }
   | { kind: "voting"; activePlayerId: PlayerId; guess: ViewerGuess }
 
 export interface ViewerRound {
@@ -51,7 +71,7 @@ export interface ViewerRound {
   turn: ViewerTurn | null
   solvedCount: number
   playerCount: number
-  lastResult: { guesserId: PlayerId; text: string; correct: boolean } | null
+  lastResult: TurnResult | null
   endedEarly: boolean
 }
 
@@ -87,6 +107,10 @@ export function getViewerState(
   const round = state.round
   const turn = round?.turn ?? null
   const voting = turn?.stage.kind === "voting" ? turn.stage.guess : null
+  const typedAnswers =
+    turn?.stage.kind === "asking" && state.settings.questionMode === "type"
+      ? turn.stage.answers
+      : null
   const allRevealed = state.phase === "roundEnd"
 
   const players: ViewerPlayer[] = state.players.map((p) => {
@@ -111,7 +135,9 @@ export function getViewerState(
       isActive: turn?.activePlayerId === p.id,
       card: card ? { ...card } : null,
       cardHidden: inRound && !visible,
-      hasVoted: !!voting && p.id in voting.votes,
+      hasVoted:
+        (!!voting && p.id in voting.votes) ||
+        (!!typedAnswers && p.id in typedAnswers),
       isGuesser: voting?.guesserId === p.id,
     }
   })
@@ -136,10 +162,22 @@ export function getViewerState(
         },
       }
     } else if (stage.kind === "asking") {
+      const mode = state.settings.questionMode
+      const tally = tallyAnswers(round, turn.activePlayerId, stage.answers)
       viewerTurn = {
         kind: "asking",
         activePlayerId: turn.activePlayerId,
-        question: stage.question,
+        question: {
+          mode,
+          text: stage.question,
+          answeredCount: mode === "type" ? tally.yes + tally.no : 0,
+          eligibleCount: tally.eligible,
+          yourAnswer: stage.answers[viewerId] ?? null,
+          canAnswer:
+            mode === "type" &&
+            round.turnOrder.includes(viewerId) &&
+            viewerId !== turn.activePlayerId,
+        },
       }
     } else {
       viewerTurn = { kind: "choosing", activePlayerId: turn.activePlayerId }

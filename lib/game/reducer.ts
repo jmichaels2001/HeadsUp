@@ -2,14 +2,17 @@ import { shuffle } from "./random"
 import {
   findNextUnsolved,
   getOldestPlayer,
+  getQuestionOutcome,
   getStartBlocker,
   isGuessConfirmed,
   isRoomFull,
+  tallyAnswers,
   tallyVotes,
 } from "./selectors"
 import {
   DEFAULT_SETTINGS,
   MIN_PLAYERS,
+  type Answer,
   type Card,
   type Category,
   type GameSettings,
@@ -29,6 +32,9 @@ export type GameAction =
   | { type: "updateSettings"; by: PlayerId; settings: Partial<GameSettings> }
   | { type: "startRound"; by: PlayerId; seed: number }
   | { type: "askQuestion"; by: PlayerId; question: string }
+  /** Type mode: a player answers the pending question. */
+  | { type: "answerQuestion"; by: PlayerId; answer: Answer }
+  /** Voice mode: the asker heard the answer and ends the question. */
   | { type: "questionAnswered"; by: PlayerId }
   | { type: "makeGuess"; by: PlayerId; text: string }
   | { type: "castVote"; by: PlayerId; vote: Vote }
@@ -84,23 +90,25 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
     case "nextRound":
       if (!isHost(state, action.by) || state.phase !== "roundEnd") return state
       return dealRound(state, action.seed)
-    case "askQuestion":
+    case "askQuestion": {
+      const question = action.question.trim()
+      // In type mode the group votes on the text, so it's required.
+      if (state.settings.questionMode === "type" && !question) return state
       return withTurn(state, action.by, "choosing", (round) => ({
         ...round,
         turn: {
           activePlayerId: action.by,
-          stage: { kind: "asking", question: action.question.trim() },
+          stage: { kind: "asking", question, answers: {} },
         },
         lastResult: null,
       }))
+    }
+    case "answerQuestion":
+      return answerQuestion(state, action.by, action.answer)
     case "questionAnswered":
+      if (state.settings.questionMode !== "voice") return state
       return withTurn(state, action.by, "asking", (round) =>
-        state.settings.passAfterQuestion
-          ? advanceTurn(round, action.by)
-          : {
-              ...round,
-              turn: { activePlayerId: action.by, stage: { kind: "choosing" } },
-            },
+        afterQuestion(state, round, action.by),
       )
     case "makeGuess": {
       const text = action.text.trim()
@@ -199,6 +207,17 @@ function leave(state: GameState, playerId: PlayerId): GameState {
     return maybeResolveVote(next)
   }
 
+  if (turn.stage.kind === "asking") {
+    const answers = { ...turn.stage.answers }
+    delete answers[playerId]
+    nextRound = {
+      ...nextRound,
+      turn: { ...turn, stage: { ...turn.stage, answers } },
+    }
+    next = { ...next, round: nextRound }
+    return maybeResolveQuestion(next)
+  }
+
   return next
 }
 
@@ -256,6 +275,75 @@ function advanceTurn(round: RoundState, fromId: PlayerId): RoundState {
   }
 }
 
+/** After a question: pass the turn, or keep it if the house rule says so. */
+function afterQuestion(
+  state: GameState,
+  round: RoundState,
+  askerId: PlayerId,
+): RoundState {
+  return state.settings.passAfterQuestion
+    ? advanceTurn(round, askerId)
+    : {
+        ...round,
+        turn: { activePlayerId: askerId, stage: { kind: "choosing" } },
+      }
+}
+
+function answerQuestion(
+  state: GameState,
+  playerId: PlayerId,
+  answer: Answer,
+): GameState {
+  const round = state.round
+  if (state.phase !== "playing" || !round?.turn) return state
+  if (state.settings.questionMode !== "type") return state
+  const stage = round.turn.stage
+  if (stage.kind !== "asking") return state
+  if (playerId === round.turn.activePlayerId) return state
+  if (!round.turnOrder.includes(playerId)) return state
+
+  const next: GameState = {
+    ...state,
+    round: {
+      ...round,
+      turn: {
+        ...round.turn,
+        stage: { ...stage, answers: { ...stage.answers, [playerId]: answer } },
+      },
+    },
+  }
+  return maybeResolveQuestion(next)
+}
+
+/** Once everyone but the asker has answered, record the result and move on. */
+function maybeResolveQuestion(state: GameState): GameState {
+  const round = state.round
+  if (state.settings.questionMode !== "type") return state
+  if (!round?.turn || round.turn.stage.kind !== "asking") return state
+  const askerId = round.turn.activePlayerId
+  const { question, answers } = round.turn.stage
+  const tally = tallyAnswers(round, askerId, answers)
+  if (tally.missing > 0) return state
+
+  const resolved = afterQuestion(
+    state,
+    {
+      ...round,
+      lastResult: {
+        kind: "question",
+        askerId,
+        question,
+        outcome: getQuestionOutcome(tally),
+        yes: tally.yes,
+        no: tally.no,
+      },
+    },
+    askerId,
+  )
+  const next = { ...state, round: resolved }
+  return resolved.turn ? next : finishRound(next, false)
+}
+
 function castVote(state: GameState, voterId: PlayerId, vote: Vote): GameState {
   const round = state.round
   if (state.phase !== "playing" || !round?.turn) return state
@@ -297,7 +385,12 @@ function maybeResolveVote(state: GameState): GameState {
     {
       ...round,
       solved,
-      lastResult: { guesserId: guess.guesserId, text: guess.text, correct },
+      lastResult: {
+        kind: "guess",
+        guesserId: guess.guesserId,
+        text: guess.text,
+        correct,
+      },
     },
     guess.guesserId,
   )

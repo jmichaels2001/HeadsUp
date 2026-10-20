@@ -116,3 +116,51 @@ describe("getViewerState secrecy", () => {
     expect(view.you!.cardHidden).toBe(false)
   })
 })
+
+describe("getViewerState questions", () => {
+  it("shows answerers that someone answered, not how", () => {
+    let state = gameReducer(started(3), {
+      type: "askQuestion",
+      by: "a",
+      question: "Am I a bird?",
+    })
+    state = gameReducer(state, {
+      type: "answerQuestion",
+      by: "b",
+      answer: "no",
+    })
+    const view = getViewerState(state, "c")
+    expect(view.players.find((p) => p.id === "b")!.hasVoted).toBe(true)
+    expect(view.round!.turn).toMatchObject({
+      kind: "asking",
+      question: {
+        mode: "type",
+        text: "Am I a bird?",
+        answeredCount: 1,
+        eligibleCount: 2,
+        yourAnswer: null,
+        canAnswer: true,
+      },
+    })
+    expect(JSON.stringify(view)).not.toContain('"no"')
+  })
+
+  it("does not ask the asker to answer", () => {
+    const state = gameReducer(started(3), {
+      type: "askQuestion",
+      by: "a",
+      question: "Am I a bird?",
+    })
+    expect(getViewerState(state, "a").round!.turn).toMatchObject({
+      question: { canAnswer: false },
+    })
+  })
+
+  it("keeps the asker's card hidden through a typed question", () => {
+    const state = ask(started(3), "a", { b: "yes", c: "no" })
+    const card = state.round!.assignments.a
+    const json = JSON.stringify(getViewerState(state, "a"))
+    expect(json).not.toContain(card.label)
+    expect(json).not.toContain(card.id)
+  })
+})

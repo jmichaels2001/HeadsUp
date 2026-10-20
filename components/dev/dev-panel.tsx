@@ -42,7 +42,9 @@ export function DevPanel() {
     )
   }
 
-  const voting = view?.round?.turn?.kind === "voting"
+  const turn = view?.round?.turn
+  const voting = turn?.kind === "voting"
+  const typedQuestion = turn?.kind === "asking" && turn.question.mode === "type"
 
   function load(count: number, phase: "lobby" | "playing") {
     dev.loadScenario(count, phase)
@@ -173,6 +175,27 @@ export function DevPanel() {
                 onClick={() => dev.fillVotes("notYet")}
               >
                 All not yet
+              </Button>
+            </div>
+          </Section>
+        )}
+
+        {typedQuestion && (
+          <Section title="Fill other answers">
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button
+                size="sm"
+                variant="success"
+                onClick={() => dev.fillAnswers("yes")}
+              >
+                All yes
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => dev.fillAnswers("no")}
+              >
+                All no
               </Button>
             </div>
           </Section>

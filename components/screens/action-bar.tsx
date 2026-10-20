@@ -8,13 +8,15 @@ import {
   MessageCircleQuestion,
   PartyPopper,
   Sparkles,
+  ThumbsDown,
+  ThumbsUp,
   X,
 } from "lucide-react"
 import { useState, type FormEvent, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { ViewerState } from "@/lib/game"
+import type { QuestionMode, ViewerState } from "@/lib/game"
 import { useRoom } from "@/lib/mock/room-provider"
 
 import { nameOf, playerById } from "./game-screen"
@@ -34,19 +36,47 @@ export function ActionBar({ view }: { view: ViewerState }) {
 function LastResult({ view }: { view: ViewerState }) {
   const result = view.round?.lastResult
   if (!result) return null
+  const base =
+    "flex items-center gap-2 rounded-xl border-2 border-ink px-3 py-2 text-sm font-semibold [&>svg]:size-4 [&>svg]:shrink-0"
+
+  if (result.kind === "question") {
+    const who = nameOf(view, result.askerId)
+    const label = { yes: "Yes", no: "No", unsure: "Unsure" }[result.outcome]
+    return (
+      <p
+        role="status"
+        className={cn(
+          base,
+          result.outcome === "yes" && "bg-success-soft",
+          result.outcome === "no" && "bg-destructive-soft",
+          result.outcome === "unsure" && "bg-warning-soft",
+        )}
+      >
+        {result.outcome === "yes" ? (
+          <ThumbsUp aria-hidden />
+        ) : result.outcome === "no" ? (
+          <ThumbsDown aria-hidden />
+        ) : (
+          <CircleHelp aria-hidden />
+        )}
+        <span>
+          {who} asked &ldquo;{result.question}&rdquo;: <strong>{label}</strong>{" "}
+          ({result.yes} yes, {result.no} no)
+        </span>
+      </p>
+    )
+  }
+
   const guesser = playerById(view, result.guesserId)
   const who = nameOf(view, result.guesserId)
   return (
     <p
       role="status"
-      className={cn(
-        "flex items-center gap-2 rounded-xl border-2 border-ink px-3 py-2 text-sm font-semibold",
-        result.correct ? "bg-success-soft" : "bg-muted",
-      )}
+      className={cn(base, result.correct ? "bg-success-soft" : "bg-muted")}
     >
       {result.correct ? (
         <>
-          <PartyPopper className="size-4 shrink-0" aria-hidden />
+          <PartyPopper aria-hidden />
           <span>
             {who} got it!
             {guesser?.card && (
@@ -63,7 +93,7 @@ function LastResult({ view }: { view: ViewerState }) {
         </>
       ) : (
         <>
-          <X className="size-4 shrink-0" aria-hidden />
+          <X aria-hidden />
           <span>
             Not yet for {who}: &ldquo;{result.text}&rdquo;
           </span>
@@ -173,49 +203,96 @@ function TurnPanel({ view }: { view: ViewerState }) {
   }
 
   if (turn.kind === "asking") {
-    if (yourTurn) {
+    const q = turn.question
+
+    if (q.mode === "voice") {
+      if (yourTurn) {
+        return (
+          <Prompt
+            icon={<MessageCircleQuestion />}
+            title="Ask your question out loud"
+          >
+            <p className="text-sm text-muted-foreground">
+              Listen to the group&apos;s answer, then tap below.
+            </p>
+            <Button size="lg" onClick={actions.questionAnswered}>
+              {view.settings.passAfterQuestion ? "End turn" : "Got my answer"}
+            </Button>
+          </Prompt>
+        )
+      }
       return (
         <Prompt
           icon={<MessageCircleQuestion />}
-          title={
-            turn.question ? (
-              <>You asked: &ldquo;{turn.question}&rdquo;</>
-            ) : (
-              "Ask your question out loud"
-            )
-          }
+          title={`${activeName} is asking a question`}
         >
-          <p className="text-sm text-muted-foreground">
-            Listen to the group&apos;s answer, then continue.
-          </p>
-          <Button size="lg" onClick={actions.questionAnswered}>
-            {view.settings.passAfterQuestion
-              ? "Got my answer, pass the turn"
-              : "Got my answer"}
-          </Button>
+          <p className="text-sm text-muted-foreground">Answer out loud!</p>
+          {solvedNote}
         </Prompt>
       )
     }
+
+    if (!q.canAnswer) {
+      return (
+        <Prompt
+          icon={<Hourglass />}
+          title={<>You asked: &ldquo;{q.text}&rdquo;</>}
+        >
+          <p className="text-sm text-muted-foreground">
+            Waiting for everyone to answer.
+          </p>
+          <VoteProgress
+            voted={q.answeredCount}
+            total={q.eligibleCount}
+            label="answered"
+          />
+        </Prompt>
+      )
+    }
+
     return (
       <Prompt
         icon={<MessageCircleQuestion />}
         title={
-          turn.question ? (
-            <>
-              {activeName} asks: &ldquo;{turn.question}&rdquo;
-            </>
-          ) : (
-            `${activeName} is asking a question`
-          )
+          <>
+            {activeName} asks: &ldquo;{q.text}&rdquo;
+          </>
         }
       >
-        <p className="text-sm text-muted-foreground">Answer out loud!</p>
+        <p className="text-sm text-muted-foreground">
+          Check {activeName}&apos;s card and answer.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Button
+            size="lg"
+            variant={q.yourAnswer === "yes" ? "success" : "outline"}
+            aria-pressed={q.yourAnswer === "yes"}
+            onClick={() => actions.answerQuestion("yes")}
+          >
+            <ThumbsUp aria-hidden />
+            Yes
+          </Button>
+          <Button
+            size="lg"
+            variant={q.yourAnswer === "no" ? "destructive" : "outline"}
+            aria-pressed={q.yourAnswer === "no"}
+            onClick={() => actions.answerQuestion("no")}
+          >
+            <ThumbsDown aria-hidden />
+            No
+          </Button>
+        </div>
+        <VoteProgress
+          voted={q.answeredCount}
+          total={q.eligibleCount}
+          label="answered"
+        />
         {solvedNote}
       </Prompt>
     )
   }
 
-  if (yourTurn) return <YourTurnActions />
+  if (yourTurn) return <YourTurnActions mode={view.settings.questionMode} />
 
   return (
     <Prompt icon={<Hourglass />} title={`${activeName}'s turn`}>
@@ -227,14 +304,14 @@ function TurnPanel({ view }: { view: ViewerState }) {
   )
 }
 
-function YourTurnActions() {
+function YourTurnActions({ mode: questionMode }: { mode: QuestionMode }) {
   const { actions } = useRoom()
   const [mode, setMode] = useState<"choose" | "ask" | "guess">("choose")
   const [text, setText] = useState("")
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    if (mode === "ask") actions.askQuestion(text)
+    if (mode === "ask" && text.trim()) actions.askQuestion(text)
     if (mode === "guess" && text.trim()) actions.makeGuess(text)
   }
 
@@ -245,7 +322,15 @@ function YourTurnActions() {
           Ask the group a yes/no question about your card, or take a guess.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <Button size="lg" onClick={() => setMode("ask")}>
+          <Button
+            size="lg"
+            onClick={() =>
+              // Voice mode: no typing, just ask out loud.
+              questionMode === "voice"
+                ? actions.askQuestion("")
+                : setMode("ask")
+            }
+          >
             <MessageCircleQuestion aria-hidden />
             Ask
           </Button>
@@ -277,7 +362,7 @@ function YourTurnActions() {
         value={text}
         onChange={(e) => setText(e.target.value)}
         maxLength={120}
-        placeholder={asking ? "Am I an animal? (optional)" : "I'm a penguin!"}
+        placeholder={asking ? "Am I an animal?" : "I'm a penguin!"}
       />
       <div className="grid grid-cols-2 gap-3">
         <Button
@@ -295,7 +380,7 @@ function YourTurnActions() {
           type="submit"
           size="lg"
           variant={asking ? "default" : "secondary"}
-          disabled={!asking && !text.trim()}
+          disabled={!text.trim()}
         >
           {asking ? "Ask the group" : "Submit guess"}
         </Button>
@@ -304,7 +389,15 @@ function YourTurnActions() {
   )
 }
 
-function VoteProgress({ voted, total }: { voted: number; total: number }) {
+function VoteProgress({
+  voted,
+  total,
+  label = "voted",
+}: {
+  voted: number
+  total: number
+  label?: string
+}) {
   return (
     <div className="flex items-center gap-3">
       <div
@@ -313,7 +406,7 @@ function VoteProgress({ voted, total }: { voted: number; total: number }) {
         aria-valuemin={0}
         aria-valuemax={total}
         aria-valuenow={voted}
-        aria-label="Votes in"
+        aria-label={`${label} so far`}
       >
         <div
           className="h-full bg-primary transition-[width]"
@@ -321,7 +414,7 @@ function VoteProgress({ voted, total }: { voted: number; total: number }) {
         />
       </div>
       <span className="text-sm font-bold text-muted-foreground">
-        {voted}/{total} voted
+        {voted}/{total} {label}
       </span>
     </div>
   )

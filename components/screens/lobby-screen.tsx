@@ -1,7 +1,14 @@
 "use client"
 
 import { cn } from "cn"
-import { Check, Copy, TriangleAlert, UserPlus } from "lucide-react"
+import {
+  Check,
+  Copy,
+  Keyboard,
+  Mic,
+  TriangleAlert,
+  UserPlus,
+} from "lucide-react"
 import { useState } from "react"
 
 import { MediaIndicators } from "@/components/game/media-indicators"
@@ -14,6 +21,21 @@ import { useRoom } from "@/lib/mock/room-provider"
 import { RoomHeader } from "./room-header"
 
 const DECKS = getDeckSummaries()
+
+const QUESTION_MODES = [
+  {
+    id: "type",
+    label: "Type",
+    icon: Keyboard,
+    description: "Type the question; everyone taps Yes or No.",
+  },
+  {
+    id: "voice",
+    label: "Voice",
+    icon: Mic,
+    description: "Ask out loud; end your turn when you've heard.",
+  },
+] as const
 
 export function startBlockerMessage(
   blocker: StartBlocker | null,
@@ -166,6 +188,45 @@ export function LobbyScreen({ view }: { view: ViewerState }) {
 
           <div className="rounded-2xl border-2 border-ink bg-card p-4 shadow-pop-sm sm:p-5">
             <h2 className="mb-3 text-xl font-semibold">House rules</h2>
+            <fieldset className="mb-4">
+              <legend className="mb-2 font-semibold">Questions</legend>
+              <div
+                role="radiogroup"
+                aria-label="Question mode"
+                className="grid grid-cols-2 gap-2"
+              >
+                {QUESTION_MODES.map((m) => {
+                  const selected = view.settings.questionMode === m.id
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      disabled={!view.isHost}
+                      onClick={() =>
+                        actions.updateSettings({ questionMode: m.id })
+                      }
+                      className={cn(
+                        "flex flex-col items-start gap-0.5 rounded-xl border-2 border-ink p-3 text-left outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-default",
+                        selected
+                          ? "bg-secondary shadow-pop-sm"
+                          : "bg-background enabled:hover:bg-muted",
+                        !selected && !view.isHost && "opacity-60",
+                      )}
+                    >
+                      <span className="inline-flex items-center gap-1.5 font-heading text-lg font-semibold">
+                        <m.icon className="size-4" aria-hidden />
+                        {m.label}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {m.description}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </fieldset>
             <label className="flex items-start gap-3">
               <input
                 type="checkbox"

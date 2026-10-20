@@ -52,6 +52,11 @@ export interface Category {
 
 export type Vote = "correct" | "notYet"
 
+export type Answer = "yes" | "no"
+
+/** Group answer to a typed question; a tie is "unsure". */
+export type QuestionOutcome = "yes" | "no" | "unsure"
+
 export interface PendingGuess {
   guesserId: PlayerId
   text: string
@@ -60,7 +65,12 @@ export interface PendingGuess {
 
 export type TurnStage =
   | { kind: "choosing" }
-  | { kind: "asking"; question: string }
+  | {
+      kind: "asking"
+      question: string
+      /** Type mode only: everyone but the asker answers yes/no. */
+      answers: Record<PlayerId, Answer>
+    }
   | { kind: "voting"; guess: PendingGuess }
 
 export interface TurnState {
@@ -69,10 +79,22 @@ export interface TurnState {
 }
 
 export interface GuessResult {
+  kind: "guess"
   guesserId: PlayerId
   text: string
   correct: boolean
 }
+
+export interface QuestionResult {
+  kind: "question"
+  askerId: PlayerId
+  question: string
+  outcome: QuestionOutcome
+  yes: number
+  no: number
+}
+
+export type TurnResult = GuessResult | QuestionResult
 
 export interface RoundState {
   number: number
@@ -83,11 +105,18 @@ export interface RoundState {
   solved: PlayerId[]
   /** Null once the round has ended. */
   turn: TurnState | null
-  lastResult: GuessResult | null
+  lastResult: TurnResult | null
   endedEarly: boolean
 }
 
+/**
+ * "type": the asker types a question and everyone else answers Yes / No.
+ * "voice": the group answers out loud and the asker ends the question.
+ */
+export type QuestionMode = "type" | "voice"
+
 export interface GameSettings {
+  questionMode: QuestionMode
   /**
    * If true (default), the turn passes once a question is answered.
    * If false, the asker keeps the turn and may ask again or guess.
@@ -111,4 +140,7 @@ export interface GameState {
   round: RoundState | null
 }
 
-export const DEFAULT_SETTINGS: GameSettings = { passAfterQuestion: true }
+export const DEFAULT_SETTINGS: GameSettings = {
+  questionMode: "type",
+  passAfterQuestion: true,
+}

@@ -25,7 +25,13 @@ export function gridClassFor(count: number): string {
 export function GameScreen({ view }: { view: ViewerState }) {
   const { session, actions } = useRoom()
   const round = view.round!
-  const voting = round.turn?.kind === "voting"
+  const turn = round.turn
+  const pendingVote =
+    turn?.kind === "voting"
+      ? "guess"
+      : turn?.kind === "asking" && turn.question.mode === "type"
+        ? "question"
+        : null
 
   return (
     <>
@@ -49,7 +55,7 @@ export function GameScreen({ view }: { view: ViewerState }) {
       </div>
 
       <main className="flex-1 px-4 pb-6 sm:px-6">
-        <TileGrid view={view} votingInProgress={voting} />
+        <TileGrid view={view} pendingVote={pendingVote} />
       </main>
 
       <ActionBar view={view} />
@@ -59,10 +65,10 @@ export function GameScreen({ view }: { view: ViewerState }) {
 
 export function TileGrid({
   view,
-  votingInProgress = false,
+  pendingVote = null,
 }: {
   view: ViewerState
-  votingInProgress?: boolean
+  pendingVote?: "guess" | "question" | null
 }) {
   const { videoOrientation } = useRoom()
   return (
@@ -77,7 +83,7 @@ export function TileGrid({
           <PlayerTile
             player={p}
             colorIndex={i}
-            votingInProgress={votingInProgress}
+            pendingVote={pendingVote}
             videoSlot={
               <MockVideo
                 name={p.name}

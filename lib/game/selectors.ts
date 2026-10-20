@@ -1,10 +1,12 @@
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
+  type Answer,
   type GameState,
   type PendingGuess,
   type Player,
   type PlayerId,
+  type QuestionOutcome,
   type RoundState,
 } from "./types"
 
@@ -77,6 +79,41 @@ export function tallyVotes(round: RoundState, guess: PendingGuess): VoteTally {
 /** Strict majority of cast votes; ties count as "not yet". */
 export function isGuessConfirmed(tally: VoteTally): boolean {
   return tally.correct > tally.notYet
+}
+
+export interface AnswerTally {
+  yes: number
+  no: number
+  missing: number
+  eligible: number
+}
+
+/** Everyone in the round except the asker answers, solved players included. */
+export function tallyAnswers(
+  round: RoundState,
+  askerId: PlayerId,
+  answers: Record<PlayerId, Answer>,
+): AnswerTally {
+  const eligible = round.turnOrder.filter((id) => id !== askerId)
+  let yes = 0
+  let no = 0
+  for (const id of eligible) {
+    if (answers[id] === "yes") yes++
+    else if (answers[id] === "no") no++
+  }
+  return {
+    yes,
+    no,
+    missing: eligible.length - yes - no,
+    eligible: eligible.length,
+  }
+}
+
+/** Majority wins; a tie is "unsure". */
+export function getQuestionOutcome(tally: AnswerTally): QuestionOutcome {
+  if (tally.yes > tally.no) return "yes"
+  if (tally.no > tally.yes) return "no"
+  return "unsure"
 }
 
 /**
