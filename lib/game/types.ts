@@ -20,6 +20,8 @@ export interface Player {
   /** Join timestamp; the oldest remaining player becomes host. */
   joinedAt: number
   media: MediaState
+  /** This player's browser, to keep them from being dealt their own cards. */
+  deviceId?: string
 }
 
 export interface Card {
@@ -28,8 +30,11 @@ export interface Card {
   /** Built-in decks use emojis; custom cards use images. */
   emoji?: string
   imageUrl?: string
-  /** Device id of the browser that added a custom card. */
-  createdBy?: string
+  /**
+   * Device ids of the browsers that added a custom card (more than one when
+   * duplicates were merged). Nobody is dealt a card they created.
+   */
+  creators?: string[]
 }
 
 export type CategoryVisibility = "private" | "room" | "public"

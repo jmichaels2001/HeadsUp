@@ -133,7 +133,15 @@ export function getViewerState(
             ? "solved"
             : "playing",
       isActive: turn?.activePlayerId === p.id,
-      card: card ? { ...card } : null,
+      // Creators are device ids: nobody else needs them.
+      card: card
+        ? {
+            id: card.id,
+            label: card.label,
+            emoji: card.emoji,
+            imageUrl: card.imageUrl,
+          }
+        : null,
       cardHidden: inRound && !visible,
       hasVoted:
         (!!voting && p.id in voting.votes) ||

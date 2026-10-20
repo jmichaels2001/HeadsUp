@@ -36,11 +36,13 @@ export function getRoomService(): RoomService {
       store: new SupabaseRoomStore(db),
       notify: supabaseNotifier(db),
       video: videoConfig(),
+      loadDeck: (id) => getDeckService().loadForRoom(id),
     })
   } else if (process.env.NODE_ENV !== "production") {
     service = new RoomService({
       store: new MemoryRoomStore(),
       video: videoConfig(),
+      loadDeck: (id) => getDeckService().loadForRoom(id),
     })
   } else {
     throw notConfigured()

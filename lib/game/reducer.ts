@@ -1,4 +1,4 @@
-import { shuffle } from "./random"
+import { dealCards } from "./deal"
 import {
   findNextUnsolved,
   getOldestPlayer,
@@ -13,7 +13,6 @@ import {
   DEFAULT_SETTINGS,
   MIN_PLAYERS,
   type Answer,
-  type Card,
   type Category,
   type GameSettings,
   type GameState,
@@ -224,11 +223,8 @@ function leave(state: GameState, playerId: PlayerId): GameState {
 function dealRound(state: GameState, seed: number): GameState {
   if (getStartBlocker(state) !== null || !state.category) return state
   const turnOrder = state.players.map((p) => p.id)
-  const deck = shuffle(state.category.cards, seed)
-  const assignments: Record<PlayerId, Card> = {}
-  turnOrder.forEach((id, i) => {
-    assignments[id] = deck[i]
-  })
+  const assignments = dealCards(state.players, state.category.cards, seed)
+  if (!assignments) return state
   // Rotate who goes first each round.
   const first = turnOrder[state.roundsPlayed % turnOrder.length]
   return {

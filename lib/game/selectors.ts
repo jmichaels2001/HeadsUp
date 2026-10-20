@@ -1,3 +1,4 @@
+import { canDealFairly } from "./deal"
 import {
   MAX_PLAYERS,
   MIN_PLAYERS,
@@ -11,7 +12,12 @@ import {
 } from "./types"
 
 export type StartBlocker =
-  "noCategory" | "notEnoughPlayers" | "tooManyPlayers" | "notEnoughCards"
+  | "noCategory"
+  | "notEnoughPlayers"
+  | "tooManyPlayers"
+  | "notEnoughCards"
+  /** Enough cards, but not enough that each player didn't create. */
+  | "notEnoughOtherCards"
 
 /** Why the host can't start a round right now, or null if they can. */
 export function getStartBlocker(state: GameState): StartBlocker | null {
@@ -20,6 +26,9 @@ export function getStartBlocker(state: GameState): StartBlocker | null {
   if (count < MIN_PLAYERS) return "notEnoughPlayers"
   if (count > MAX_PLAYERS) return "tooManyPlayers"
   if (state.category.cards.length < count) return "notEnoughCards"
+  if (!canDealFairly(state.players, state.category.cards)) {
+    return "notEnoughOtherCards"
+  }
   return null
 }
 

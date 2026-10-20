@@ -81,7 +81,7 @@ describe("deck view", () => {
   it("records the creator on every card", async () => {
     const deck = await service.createDeck(ALICE, META)
     const view = await service.addCard(deck.id, ALICE, { label: "Vader" })
-    expect(view.myCards[0].createdBy).toBe(ALICE)
+    expect(view.myCards[0].creators).toEqual([ALICE])
   })
 
   it("is a playable deck only from the minimum card count, from anyone", async () => {

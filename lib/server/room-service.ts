@@ -8,6 +8,7 @@ import {
   gameReducer,
   getViewerState,
   isRoomFull,
+  type Category,
   type GameAction,
   type GameState,
   type Player,
@@ -75,6 +76,8 @@ export interface RoomServiceDeps {
   playerId?: () => string
   /** Omit to run without video; video tokens are then "unavailable". */
   video?: VideoConfig | null
+  /** Custom decks by id (throws RoomError if it can't be used). */
+  loadDeck?: (id: string) => Promise<Category>
 }
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -103,6 +106,7 @@ export class RoomService {
   private roomCode: () => string
   private playerId: () => string
   private video: VideoConfig | null
+  private loadDeck: ((id: string) => Promise<Category>) | null
 
   constructor(deps: RoomServiceDeps) {
     this.store = deps.store
@@ -114,6 +118,7 @@ export class RoomService {
     this.playerId =
       deps.playerId ?? (() => `p_${randomBytes(6).toString("base64url")}`)
     this.video = deps.video ?? null
+    this.loadDeck = deps.loadDeck ?? null
   }
 
   async createRoom(input: JoinRequest): Promise<SeatResponse> {
@@ -150,7 +155,7 @@ export class RoomService {
     action: ClientAction,
   ): Promise<RoomSnapshot> {
     const playerId = await this.authenticate(code, token)
-    const gameAction = this.toGameAction(playerId, action)
+    const gameAction = await this.toGameAction(playerId, action)
     const result = await this.mutate(code, (state) => {
       const next = gameReducer(state, gameAction)
       if (next === state) {
@@ -221,6 +226,7 @@ export class RoomService {
       name: input.name.trim(),
       joinedAt: this.now(),
       media: { ...input.media, connection: "good" },
+      ...(input.deviceId && { deviceId: input.deviceId }),
     }
   }
 
@@ -251,10 +257,23 @@ export class RoomService {
     return playerId
   }
 
-  private toGameAction(by: PlayerId, action: ClientAction): GameAction {
+  private async toGameAction(
+    by: PlayerId,
+    action: ClientAction,
+  ): Promise<GameAction> {
     switch (action.type) {
       case "selectCategory": {
-        const category = findDeck(action.categoryId)
+        // Custom decks are snapshotted now, so later edits don't affect
+        // this room until the host picks the deck again.
+        const category =
+          findDeck(action.categoryId) ??
+          (await this.loadDeck?.(action.categoryId).catch((err: unknown) => {
+            // A 404 here would read as "room not found" to the client.
+            if (err instanceof RoomError && err.code === "notFound") {
+              throw new RoomError("invalid", "That deck isn't available.")
+            }
+            throw err
+          }))
         if (!category) throw new RoomError("invalid", "Unknown category.")
         return { type: "selectCategory", by, category }
       }

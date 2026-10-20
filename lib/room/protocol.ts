@@ -1,5 +1,6 @@
 import { z } from "zod"
 
+import { deviceIdSchema } from "@/lib/custom-decks/protocol"
 import type { ViewerState } from "@/lib/game"
 
 /**
@@ -10,6 +11,8 @@ import type { ViewerState } from "@/lib/game"
 export const joinRequestSchema = z.strictObject({
   name: z.string().trim().min(1).max(20),
   media: z.strictObject({ mic: z.boolean(), camera: z.boolean() }),
+  /** So the server never deals this player a card they created. */
+  deviceId: deviceIdSchema.optional(),
 })
 export type JoinRequest = z.infer<typeof joinRequestSchema>
 

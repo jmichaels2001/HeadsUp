@@ -16,12 +16,10 @@ import { PlayerVideo } from "@/components/game/participant-video"
 import { PlayerChip } from "@/components/game/player-chip"
 import { Button } from "@/components/ui/button"
 import { MAX_PLAYERS, type StartBlocker, type ViewerState } from "@/lib/game"
-import { getDeckSummaries } from "@/lib/decks"
 import { useRoom } from "@/lib/room"
 
+import { DeckPicker } from "./deck-picker"
 import { RoomHeader } from "./room-header"
-
-const DECKS = getDeckSummaries()
 
 const QUESTION_MODES = [
   {
@@ -51,13 +49,18 @@ export function startBlockerMessage(
       return `Rooms fit up to ${MAX_PLAYERS} players.`
     case "notEnoughCards":
       return `${view.category?.name} has ${view.category?.cardCount} cards, but there are ${view.players.length} players.`
+    case "notEnoughOtherCards":
+      return "Not enough cards made by other players: nobody can be dealt a card they made."
     default:
       return null
   }
 }
 
 export function NeedMoreCardsAlert({ view }: { view: ViewerState }) {
-  if (view.startBlocker !== "notEnoughCards") return null
+  const blocker = view.startBlocker
+  if (blocker !== "notEnoughCards" && blocker !== "notEnoughOtherCards") {
+    return null
+  }
   return (
     <div
       role="alert"
@@ -67,10 +70,12 @@ export function NeedMoreCardsAlert({ view }: { view: ViewerState }) {
       <div>
         <p className="font-heading text-lg font-semibold">Need more cards</p>
         <p className="text-sm font-semibold">
-          {startBlockerMessage("notEnoughCards", view)}{" "}
-          {view.isHost
-            ? "Pick a bigger deck to start."
-            : "The host needs to pick a bigger deck."}
+          {startBlockerMessage(blocker, view)}{" "}
+          {blocker === "notEnoughOtherCards"
+            ? "Have someone else add cards, or pick another deck."
+            : view.isHost
+              ? "Pick a bigger deck to start."
+              : "The host needs to pick a bigger deck."}
         </p>
       </div>
     </div>
@@ -133,64 +138,7 @@ export function LobbyScreen({ view }: { view: ViewerState }) {
         </section>
 
         <section className="flex flex-col gap-4">
-          <div className="rounded-2xl border-2 border-ink bg-card p-4 shadow-pop-sm sm:p-5">
-            <h2 className="mb-1 text-xl font-semibold">Category</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              {view.isHost
-                ? "Pick the deck everyone's cards come from."
-                : `${host?.name ?? "The host"} picks the deck.`}
-            </p>
-            <div
-              role="radiogroup"
-              aria-label="Category"
-              className="grid grid-cols-1 gap-3 sm:grid-cols-2"
-            >
-              {DECKS.map((deck) => {
-                const selected = view.category?.id === deck.id
-                const tooSmall = deck.cardCount < view.players.length
-                return (
-                  <button
-                    key={deck.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={selected}
-                    disabled={!view.isHost}
-                    onClick={() => actions.selectCategory(deck.id)}
-                    className={cn(
-                      "flex items-start gap-3 rounded-xl border-2 border-ink p-3 text-left transition-colors outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-default",
-                      selected
-                        ? "bg-secondary shadow-pop-sm"
-                        : "bg-background enabled:hover:bg-muted",
-                      !selected && !view.isHost && "opacity-60",
-                    )}
-                  >
-                    <span aria-hidden className="text-3xl leading-none">
-                      {deck.emoji}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1 font-heading text-lg font-semibold">
-                        {deck.name}
-                        {selected && <Check className="size-4" aria-hidden />}
-                      </span>
-                      <span className="block text-sm text-muted-foreground">
-                        {deck.description}
-                      </span>
-                      <span
-                        className={cn(
-                          "mt-1 block text-xs font-bold",
-                          tooSmall
-                            ? "text-destructive"
-                            : "text-muted-foreground",
-                        )}
-                      >
-                        {deck.cardCount} cards
-                      </span>
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
+          <DeckPicker view={view} />
 
           <div className="rounded-2xl border-2 border-ink bg-card p-4 shadow-pop-sm sm:p-5">
             <h2 className="mb-3 text-xl font-semibold">House rules</h2>

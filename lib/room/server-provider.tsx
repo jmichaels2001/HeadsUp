@@ -29,6 +29,8 @@ import {
   type SeatResponse,
   type VideoTokenResponse,
 } from "./protocol"
+import { getDeviceId } from "@/lib/custom-decks/device-id"
+
 import { loadSeats, saveSeats } from "./seats"
 import { getBrowserSupabase } from "./supabase-browser"
 
@@ -294,7 +296,7 @@ export function ServerRoomProvider({ children }: { children: ReactNode }) {
           try {
             const res = await request<SeatResponse>("/api/rooms", {
               method: "POST",
-              body: { name, media },
+              body: { name, media, deviceId: getDeviceId() },
             })
             seatUp(res)
             return { ok: true, code: res.code }
@@ -306,7 +308,10 @@ export function ServerRoomProvider({ children }: { children: ReactNode }) {
           try {
             const res = await request<SeatResponse>(
               `/api/rooms/${roomCode}/join`,
-              { method: "POST", body: { name, media } },
+              {
+                method: "POST",
+                body: { name, media, deviceId: getDeviceId() },
+              },
             )
             seatUp(res)
             return "ok"

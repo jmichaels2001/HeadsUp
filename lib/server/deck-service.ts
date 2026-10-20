@@ -1,6 +1,10 @@
 import { randomBytes } from "node:crypto"
 
-import { getDeckView, type CardRecord } from "@/lib/custom-decks/deck-view"
+import {
+  getDeckView,
+  toRoomCategory,
+  type CardRecord,
+} from "@/lib/custom-decks/deck-view"
 import {
   deviceIdSchema,
   isPlayable,
@@ -15,6 +19,7 @@ import {
   type UpdateCardRequest,
   type UpdateDeckRequest,
 } from "@/lib/custom-decks/protocol"
+import type { Category } from "@/lib/game"
 
 import type { DeckStore } from "./deck-store"
 import { imageFileName, sniffImageType, type ImageStore } from "./image-store"
@@ -71,6 +76,23 @@ export class DeckService {
     const deck = await this.store.getDeck(id)
     if (!deck) throw notFound()
     return getDeckView(deck, await this.store.getCards(id), device)
+  }
+
+  /**
+   * A deck as a room snapshot: every card (duplicates merged), for the
+   * server-side game state only. Players get its name and card count.
+   */
+  async loadForRoom(id: string): Promise<Category> {
+    const deck = await this.store.getDeck(id)
+    if (!deck || deck.hidden) throw notFound()
+    const cards = await this.store.getCards(id)
+    if (!isPlayable(cards.length)) {
+      throw new RoomError(
+        "rejected",
+        "That deck is still a draft. It needs more cards first.",
+      )
+    }
+    return toRoomCategory(deck, cards)
   }
 
   async listMyDecks(deviceId: string): Promise<DeckListItem[]> {
