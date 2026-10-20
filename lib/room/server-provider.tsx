@@ -27,6 +27,7 @@ import {
   type RoomSnapshot,
   type Seat,
   type SeatResponse,
+  type VideoTokenResponse,
 } from "./protocol"
 import { loadSeats, saveSeats } from "./seats"
 import { getBrowserSupabase } from "./supabase-browser"
@@ -318,6 +319,17 @@ export function ServerRoomProvider({ children }: { children: ReactNode }) {
           }
         },
         hasSeat: (roomCode) => !!seats[roomCode],
+        videoToken: async () => {
+          if (!code || !token) return null
+          try {
+            return await request<VideoTokenResponse>(
+              `/api/rooms/${code}/video-token`,
+              { method: "POST", token },
+            )
+          } catch {
+            return null // not configured (503) or seat gone
+          }
+        },
         leaveRoom: () => {
           if (!code || !token) return
           void request(`/api/rooms/${code}/actions`, {

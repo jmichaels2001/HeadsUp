@@ -11,6 +11,8 @@ import type {
   Vote,
 } from "@/lib/game"
 
+import type { VideoTokenResponse } from "./protocol"
+
 /**
  * What the UI gets from a room provider. Both the Phase 1 mock and the real
  * server-backed provider implement this, so screens don't care which is live.
@@ -78,6 +80,8 @@ export interface RoomContextValue {
     ) => Promise<JoinResult>
     /** True if this browser already holds a seat in that room. */
     hasSeat: (code: string) => boolean
+    /** Credentials for this room's video call; null when video is off. */
+    videoToken: () => Promise<VideoTokenResponse | null>
     leaveRoom: () => void
   }
   actions: RoomActions

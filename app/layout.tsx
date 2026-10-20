@@ -4,6 +4,7 @@ import { Fredoka, Nunito } from "next/font/google"
 import { DevPanel } from "@/components/dev/dev-panel"
 import { devToolsEnabled } from "@/lib/dev-tools"
 import { RoomProvider } from "@/lib/room"
+import { VideoProvider } from "@/lib/video"
 
 import "./globals.css"
 
@@ -27,8 +28,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <RoomProvider>
-          {children}
-          {devToolsEnabled && <DevPanel />}
+          <VideoProvider>
+            {children}
+            {devToolsEnabled && <DevPanel />}
+          </VideoProvider>
         </RoomProvider>
       </body>
     </html>

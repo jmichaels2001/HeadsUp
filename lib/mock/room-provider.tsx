@@ -148,6 +148,7 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
           }))
           return "ok"
         },
+        videoToken: async () => null,
         hasSeat: (code) =>
           !!game &&
           game.roomCode === code &&
