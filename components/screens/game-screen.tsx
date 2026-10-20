@@ -4,7 +4,7 @@ import { cn } from "cn"
 import { Flag } from "lucide-react"
 import { useState } from "react"
 
-import { MockVideo } from "@/components/game/mock-video"
+import { PlayerVideo } from "@/components/game/participant-video"
 import { PlayerTile } from "@/components/game/player-tile"
 import { Button } from "@/components/ui/button"
 import type { ViewerPlayer, ViewerState } from "@/lib/game"
@@ -70,7 +70,6 @@ export function TileGrid({
   view: ViewerState
   pendingVote?: "guess" | "question" | null
 }) {
-  const { videoOrientation } = useRoom()
   return (
     <ul
       className={cn(
@@ -84,14 +83,7 @@ export function TileGrid({
             player={p}
             colorIndex={i}
             pendingVote={pendingVote}
-            videoSlot={
-              <MockVideo
-                name={p.name}
-                colorIndex={i}
-                orientation={videoOrientation(p.id)}
-                cameraOn={p.media.camera}
-              />
-            }
+            videoSlot={<PlayerVideo player={p} colorIndex={i} />}
           />
         </li>
       ))}

@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react"
 import { useRouter } from "next/navigation"
 import type { ReactNode } from "react"
 
+import { MediaToggles } from "@/components/game/call-controls"
 import { Button } from "@/components/ui/button"
 import type { ViewerState } from "@/lib/game"
 
@@ -24,6 +25,7 @@ export function RoomHeader({
       <span className="rounded-full border-2 border-ink bg-card px-3 py-1 font-heading font-semibold tracking-widest">
         {view.roomCode}
       </span>
+      {view.you && <MediaToggles you={view.you} />}
       {children}
       <Button
         variant="ghost"

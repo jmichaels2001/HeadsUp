@@ -3,20 +3,21 @@
 import { ArrowLeft, Mic, MicOff, Video, VideoOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 
 import { MockVideo } from "@/components/game/mock-video"
+import { TrackVideo } from "@/components/game/participant-video"
 import { StatusScreen } from "@/components/game/status-screen"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useRoom } from "@/lib/room"
 import { isValidRoomCode } from "@/lib/room/protocol"
+import { useVideo } from "@/lib/video"
 
 import { AppHeader } from "./app-header"
 
 type Step = "name" | "media" | "joining" | JoinFailure
 type JoinFailure = "full" | "notFound" | "error"
-type Permission = "prompt" | "granted" | "denied"
 
 const MAX_NAME = 20
 
@@ -36,6 +37,14 @@ const FAILURES: Record<JoinFailure, { title: string; description: string }> = {
   },
 }
 
+const DEVICE_PROBLEM: Partial<Record<string, string>> = {
+  declined: "No camera for now. You can turn it on later from the room.",
+  denied:
+    "Your browser blocked the camera and mic. Allow them in the address bar to be seen.",
+  noDevice: "We couldn't find a camera or microphone.",
+  error: "Your camera or mic didn't start. Another app may be using it.",
+}
+
 /** Name + camera check, then create a room (no code) or join `code`. */
 export function JoinScreen({ code }: { code?: string }) {
   const creating = !code
@@ -44,9 +53,21 @@ export function JoinScreen({ code }: { code?: string }) {
   const [step, setStep] = useState<Step>("name")
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState<string | null>(null)
-  const [permission, setPermission] = useState<Permission>("prompt")
+  const { preview } = useVideo()
+  const [declined, setDeclined] = useState(false)
   const [mic, setMic] = useState(true)
   const [camera, setCamera] = useState(true)
+  const joined = useRef(false)
+
+  // Leaving without joining: let go of the camera. Joining hands the tracks
+  // to the call instead, so there's no second permission prompt.
+  const stopPreview = preview.stop
+  useEffect(
+    () => () => {
+      if (!joined.current) stopPreview()
+    },
+    [stopPreview],
+  )
 
   const valid = creating || isValidRoomCode(code)
   const alreadySeated = ready && !!code && session.hasSeat(code)
@@ -56,22 +77,33 @@ export function JoinScreen({ code }: { code?: string }) {
     if (alreadySeated && step === "name") router.replace(`/room/${code}`)
   }, [alreadySeated, step, code, router])
 
+  const deviceReady = preview.status === "ready"
+  const asked =
+    declined || (preview.status !== "idle" && preview.status !== "requesting")
+
   async function join() {
     setStep("joining")
+    joined.current = true
     const media = {
-      mic: permission === "granted" && mic,
-      camera: permission === "granted" && camera,
+      mic: deviceReady && preview.hasAudio && mic,
+      camera: deviceReady && preview.hasVideo && camera,
     }
     const trimmed = name.trim()
     if (creating) {
       const res = await session.createRoom(trimmed, media)
       if (res.ok) router.replace(`/room/${res.code}`)
-      else setStep("error")
+      else {
+        joined.current = false
+        setStep("error")
+      }
       return
     }
     const res = await session.joinRoom(code, trimmed, media)
     if (res === "ok") router.replace(`/room/${code}`)
-    else setStep(res)
+    else {
+      joined.current = false
+      setStep(res)
+    }
   }
 
   if (!valid) {
@@ -215,37 +247,45 @@ export function JoinScreen({ code }: { code?: string }) {
             </p>
 
             <div className="aspect-[4/3] overflow-hidden rounded-xl border-2 border-ink">
-              <MockVideo
-                name={name}
-                colorIndex={0}
-                orientation="landscape"
-                cameraOn={permission === "granted" && camera}
-              />
+              {preview.videoTrack && camera ? (
+                <TrackVideo track={preview.videoTrack} mirror />
+              ) : (
+                <MockVideo
+                  name={name}
+                  colorIndex={0}
+                  orientation="landscape"
+                  cameraOn={false}
+                />
+              )}
             </div>
 
-            {permission === "prompt" && (
+            {!asked && (
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   size="lg"
                   className="flex-1"
-                  onClick={() => setPermission("granted")}
+                  disabled={preview.status === "requesting"}
+                  onClick={() => void preview.start()}
                 >
-                  Allow camera &amp; mic
+                  {preview.status === "requesting"
+                    ? "Waiting for your browser…"
+                    : "Allow camera & mic"}
                 </Button>
                 <Button
                   size="lg"
                   variant="outline"
-                  onClick={() => setPermission("denied")}
+                  onClick={() => setDeclined(true)}
                 >
                   Not now
                 </Button>
               </div>
             )}
 
-            {permission === "granted" && (
+            {deviceReady && (
               <div className="flex gap-2">
                 <Button
                   variant={mic ? "outline" : "destructive"}
+                  disabled={!preview.hasAudio}
                   onClick={() => setMic((v) => !v)}
                   aria-pressed={!mic}
                 >
@@ -254,6 +294,7 @@ export function JoinScreen({ code }: { code?: string }) {
                 </Button>
                 <Button
                   variant={camera ? "outline" : "destructive"}
+                  disabled={!preview.hasVideo}
                   onClick={() => setCamera((v) => !v)}
                   aria-pressed={!camera}
                 >
@@ -263,17 +304,26 @@ export function JoinScreen({ code }: { code?: string }) {
               </div>
             )}
 
-            {permission === "denied" && (
+            {deviceReady && (!preview.hasAudio || !preview.hasVideo) && (
               <p className="rounded-xl border-2 border-ink bg-warning-soft p-3 text-sm font-semibold text-warning">
-                You can still play, but friends won&apos;t see you. You can turn
-                your camera on later.
+                {preview.hasVideo
+                  ? "We couldn't find a microphone. Friends will see you but not hear you."
+                  : "We couldn't find a camera. Friends will hear you but not see you."}
+              </p>
+            )}
+
+            {asked && !deviceReady && (
+              <p className="rounded-xl border-2 border-ink bg-warning-soft p-3 text-sm font-semibold text-warning">
+                {DEVICE_PROBLEM[declined ? "declined" : preview.status] ??
+                  DEVICE_PROBLEM.declined}{" "}
+                You can still play, but friends won&apos;t see you.
               </p>
             )}
 
             <Button
               size="lg"
               variant="secondary"
-              disabled={permission === "prompt"}
+              disabled={!asked}
               onClick={() => void join()}
             >
               {creating ? "Create room" : "Join room"}

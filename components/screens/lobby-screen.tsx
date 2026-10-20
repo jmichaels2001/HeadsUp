@@ -12,6 +12,7 @@ import {
 import { useState } from "react"
 
 import { MediaIndicators } from "@/components/game/media-indicators"
+import { PlayerVideo } from "@/components/game/participant-video"
 import { PlayerChip } from "@/components/game/player-chip"
 import { Button } from "@/components/ui/button"
 import { MAX_PLAYERS, type StartBlocker, type ViewerState } from "@/lib/game"
@@ -97,26 +98,31 @@ export function LobbyScreen({ view }: { view: ViewerState }) {
                 {view.players.length}/{MAX_PLAYERS}
               </span>
             </div>
-            <ul className="flex flex-col gap-2">
+            <ul className="grid grid-cols-2 gap-3">
               {view.players.map((p, i) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between gap-2 rounded-xl border-2 border-ink/15 bg-background px-3 py-2"
-                >
-                  <PlayerChip player={p} colorIndex={i} />
-                  <MediaIndicators media={p.media} />
-                </li>
-              ))}
-              {Array.from({ length: openSeats }, (_, i) => (
-                <li
-                  key={`open-${i}`}
-                  className="flex items-center gap-2 rounded-xl border-2 border-dashed border-ink/20 px-3 py-2 text-sm font-semibold text-muted-foreground"
-                >
-                  <UserPlus className="size-4" aria-hidden />
-                  Open seat
+                <li key={p.id} className="flex min-w-0 flex-col gap-1.5">
+                  <div className="relative aspect-[4/3] overflow-hidden rounded-xl border-2 border-ink">
+                    <PlayerVideo player={p} colorIndex={i} />
+                    <MediaIndicators
+                      media={p.media}
+                      className="absolute right-1.5 bottom-1.5"
+                    />
+                  </div>
+                  <PlayerChip
+                    player={p}
+                    colorIndex={i}
+                    size="sm"
+                    className="px-1"
+                  />
                 </li>
               ))}
             </ul>
+            {openSeats > 0 && (
+              <p className="mt-3 flex items-center gap-2 rounded-xl border-2 border-dashed border-ink/20 px-3 py-2 text-sm font-semibold text-muted-foreground">
+                <UserPlus className="size-4" aria-hidden />
+                {openSeats} open {openSeats === 1 ? "seat" : "seats"}
+              </p>
+            )}
             {alone && (
               <p className="mt-4 rounded-xl bg-secondary/60 p-3 text-sm font-semibold text-ink">
                 It&apos;s just you so far. Share the invite link to bring

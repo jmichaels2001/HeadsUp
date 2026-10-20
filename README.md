@@ -40,6 +40,29 @@ ping on a public Realtime channel; each browser then fetches its own view,
 which never contains its own unrevealed card. RLS is on with no policies, so
 only the server's secret key can touch the tables.
 
+## LiveKit setup (live video)
+
+Video is optional: without these variables the game runs with placeholder
+tiles.
+
+1. Create a free project at [LiveKit Cloud](https://cloud.livekit.io).
+2. Under **Settings → API Keys**, create a key and copy the WebSocket URL
+   (`wss://<project>.livekit.cloud`), API key, and secret into `.env.local`:
+   `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`. All three are
+   server-only; never prefix them with `NEXT_PUBLIC_`.
+3. Restart `npm run dev` (env changes and the cached room service both need a
+   fresh server).
+4. Add the same three variables in Vercel (Production and Preview), then
+   redeploy.
+
+How it works: when you're seated in a room, the browser asks
+`/api/rooms/[code]/video-token` for a short-lived LiveKit token. The server
+checks your seat token and signs one for the call named after the room code,
+with your player id as your identity, so each feed lands in the right tile.
+The call carries only camera and mic; no game data, and nothing is recorded
+(egress is never used). Camera access needs HTTPS or `localhost`, so to test
+on a phone use a Vercel preview deploy.
+
 ## Commands
 
 - `npm run check`: typecheck, lint, tests

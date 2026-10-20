@@ -3,6 +3,7 @@
 import { cn } from "cn"
 import { CircleCheck, CircleX } from "lucide-react"
 
+import { PlayerVideo } from "@/components/game/participant-video"
 import { PlayerChip } from "@/components/game/player-chip"
 import { SecretCard } from "@/components/game/secret-card"
 import { Button } from "@/components/ui/button"
@@ -46,6 +47,9 @@ export function RoundEndScreen({ view }: { view: ViewerState }) {
                 )}
               >
                 <SecretCard card={p.card!} size="md" highlight={p.isYou} />
+                <div className="aspect-[4/3] w-full overflow-hidden rounded-xl border-2 border-ink">
+                  <PlayerVideo player={p} colorIndex={colorIndex} />
+                </div>
                 <PlayerChip player={p} colorIndex={colorIndex} size="sm" />
                 <span
                   className={cn(

@@ -1,13 +1,16 @@
 "use client"
 
 import Link from "next/link"
+import { useMemo } from "react"
 
+import { CallNotices } from "@/components/game/call-controls"
 import {
   ReconnectingBanner,
   StatusScreen,
 } from "@/components/game/status-screen"
 import { buttonVariants } from "@/components/ui/button"
 import { useRoom } from "@/lib/room"
+import { useVideo, withCallMedia } from "@/lib/video"
 
 import { AppHeader } from "./app-header"
 import { GameScreen } from "./game-screen"
@@ -15,7 +18,20 @@ import { LobbyScreen } from "./lobby-screen"
 import { RoundEndScreen } from "./round-end-screen"
 
 export function RoomScreen({ code }: { code: string }) {
-  const { ready, status, view, overlay, reconnecting: dropped } = useRoom()
+  const {
+    ready,
+    status,
+    view: roomView,
+    overlay,
+    reconnecting: dropped,
+  } = useRoom()
+  const call = useVideo()
+  // Live mic/camera/link state from the call, on top of the room's view.
+  const view = useMemo(
+    () =>
+      roomView && withCallMedia(roomView, call.callMedia, call.reconnecting),
+    [roomView, call.callMedia, call.reconnecting],
+  )
 
   if (!ready || overlay === "loading" || (status === "loading" && !view)) {
     return (
@@ -86,11 +102,12 @@ export function RoomScreen({ code }: { code: string }) {
   const reconnecting =
     dropped ||
     overlay === "reconnecting" ||
-    view.you.media.connection === "reconnecting"
+    roomView?.you?.media.connection === "reconnecting"
 
   return (
     <div className="flex min-h-full flex-1 flex-col">
       {reconnecting && <ReconnectingBanner />}
+      <CallNotices />
       <div
         className="flex flex-1 flex-col"
         aria-busy={reconnecting}
