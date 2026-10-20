@@ -6,7 +6,7 @@ A browser-based multiplayer "Headbands / Who Am I?" party game for a group of tr
 
 ## Stack
 
-Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui (Base UI) · Vitest · ESLint · Prettier. Node ≥ 22.12 (`.nvmrc` pins 24). Later phases: Supabase, LiveKit, an LLM API.
+Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 · shadcn/ui (Base UI) · Supabase (Postgres + Realtime) · zod · Vitest · ESLint · Prettier. Node ≥ 22.12 (`.nvmrc` pins 24). Later phases: LiveKit, an LLM API.
 
 ## Commands
 
@@ -22,13 +22,17 @@ Next.js 16 (App Router) · React 19 · TypeScript (strict) · Tailwind CSS v4 ·
 app/          Next.js routes (App Router)
 components/   UI only. No secrets, no server-only code.
 lib/game/     Types + pure reducer + getViewerState. No React/Next/SDK imports (ESLint-enforced).
-lib/mock/     Phase 1 mock data + MockRoomProvider that drives lib/game
+lib/room/     Client room layer: useRoom() interface, server-backed provider, wire protocol
+lib/server/   Server-only room service + stores (Supabase / memory). Never import from client code (ESLint-enforced).
+lib/mock/     Phase 1 mock room (single tab), still available via NEXT_PUBLIC_ROOM_BACKEND=mock
+app/api/      Room API route handlers
+supabase/     SQL migrations (run in the Supabase SQL editor)
 docs/         Overview and phase briefs
 ```
 
 ## Secrecy rule
 
-A player never sees their own card until it is revealed. `getViewerState(state, playerId)` returns a projection that omits the viewer's own unrevealed card entirely. Never hide it with CSS. **Components consume only the projection, never raw `GameState`.** This is a trusted-friends game, so don't add anti-cheat hardening.
+A player never sees their own card until it is revealed. `getViewerState(state, playerId)` returns a projection that omits the viewer's own unrevealed card entirely. Never hide it with CSS. **Components consume only the projection, never raw `GameState`.** In server mode the API returns only the requester's projection; Realtime messages carry no game data. This is a trusted-friends game, so don't add anti-cheat hardening.
 
 ## Rules
 

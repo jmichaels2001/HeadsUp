@@ -1,7 +1,7 @@
 import { cn } from "cn"
 import { VideoOff } from "lucide-react"
 
-import type { VideoOrientation } from "@/lib/mock/players"
+import type { VideoOrientation } from "@/lib/room"
 
 import { PlayerAvatar, playerColor } from "./player-avatar"
 

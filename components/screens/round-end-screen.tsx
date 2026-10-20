@@ -7,7 +7,7 @@ import { PlayerChip } from "@/components/game/player-chip"
 import { SecretCard } from "@/components/game/secret-card"
 import { Button } from "@/components/ui/button"
 import type { ViewerState } from "@/lib/game"
-import { useRoom } from "@/lib/mock/room-provider"
+import { useRoom } from "@/lib/room"
 
 import { NeedMoreCardsAlert } from "./lobby-screen"
 import { RoomHeader } from "./room-header"

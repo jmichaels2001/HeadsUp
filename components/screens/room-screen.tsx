@@ -7,7 +7,7 @@ import {
   StatusScreen,
 } from "@/components/game/status-screen"
 import { buttonVariants } from "@/components/ui/button"
-import { useRoom } from "@/lib/mock/room-provider"
+import { useRoom } from "@/lib/room"
 
 import { AppHeader } from "./app-header"
 import { GameScreen } from "./game-screen"
@@ -15,9 +15,9 @@ import { LobbyScreen } from "./lobby-screen"
 import { RoundEndScreen } from "./round-end-screen"
 
 export function RoomScreen({ code }: { code: string }) {
-  const { ready, view, overlay } = useRoom()
+  const { ready, status, view, overlay, reconnecting: dropped } = useRoom()
 
-  if (!ready || overlay === "loading") {
+  if (!ready || overlay === "loading" || (status === "loading" && !view)) {
     return (
       <Centered>
         <StatusScreen
@@ -29,7 +29,23 @@ export function RoomScreen({ code }: { code: string }) {
     )
   }
 
-  if (overlay === "error") {
+  if (status === "notFound") {
+    return (
+      <Centered header>
+        <StatusScreen
+          kind="error"
+          title="Room not found"
+          description={`Room ${code} doesn't exist anymore. Rooms close when everyone leaves.`}
+        >
+          <Link href="/" className={buttonVariants()}>
+            Back home
+          </Link>
+        </StatusScreen>
+      </Centered>
+    )
+  }
+
+  if (overlay === "error" || status === "error") {
     return (
       <Centered header>
         <StatusScreen
@@ -68,7 +84,9 @@ export function RoomScreen({ code }: { code: string }) {
   }
 
   const reconnecting =
-    overlay === "reconnecting" || view.you.media.connection === "reconnecting"
+    dropped ||
+    overlay === "reconnecting" ||
+    view.you.media.connection === "reconnecting"
 
   return (
     <div className="flex min-h-full flex-1 flex-col">

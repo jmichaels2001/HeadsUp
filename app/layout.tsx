@@ -3,7 +3,7 @@ import { Fredoka, Nunito } from "next/font/google"
 
 import { DevPanel } from "@/components/dev/dev-panel"
 import { devToolsEnabled } from "@/lib/dev-tools"
-import { MockRoomProvider } from "@/lib/mock/room-provider"
+import { RoomProvider } from "@/lib/room"
 
 import "./globals.css"
 
@@ -26,10 +26,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${nunito.variable} ${fredoka.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <MockRoomProvider>
+        <RoomProvider>
           {children}
           {devToolsEnabled && <DevPanel />}
-        </MockRoomProvider>
+        </RoomProvider>
       </body>
     </html>
   )

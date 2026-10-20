@@ -15,8 +15,8 @@ import { MediaIndicators } from "@/components/game/media-indicators"
 import { PlayerChip } from "@/components/game/player-chip"
 import { Button } from "@/components/ui/button"
 import { MAX_PLAYERS, type StartBlocker, type ViewerState } from "@/lib/game"
-import { getDeckSummaries } from "@/lib/mock/decks"
-import { useRoom } from "@/lib/mock/room-provider"
+import { getDeckSummaries } from "@/lib/decks"
+import { useRoom } from "@/lib/room"
 
 import { RoomHeader } from "./room-header"
 

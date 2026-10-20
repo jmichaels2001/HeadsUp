@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Headbands
 
-## Getting Started
+A browser-based "Who Am I?" party game for friends on a video call. Everyone
+sees everyone's card except their own.
 
-First, run the development server:
+See `docs/overview.md` for the project plan and `CLAUDE.md` for conventions.
+
+## Run it locally
+
+Requires Node 22.12+ (`.nvmrc` pins 24).
 
 ```bash
+npm install
+cp .env.example .env.local   # then fill it in (see below)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+With no env vars set you get the Phase 1 **mock** room: a single-tab
+simulation with a dev panel for viewing as any player. Set
+`NEXT_PUBLIC_ROOM_BACKEND=server` to use real rooms backed by an in-memory
+store (fine for local testing; rooms vanish on restart).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+To test multiplayer, use separate browser profiles (e.g. a normal and a
+private window, or a phone). Two tabs in the same profile share a seat.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Supabase setup (real rooms)
 
-## Learn More
+1. In the Supabase dashboard, open **SQL Editor** and run
+   `supabase/migrations/0001_rooms.sql` once.
+2. Under **Project Settings → API Keys**, copy the project URL, the
+   **publishable** key, and a **secret** key into `.env.local`:
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY`.
+3. Add the same three variables in Vercel → Settings → Environment
+   Variables (Production and Preview), then redeploy.
 
-To learn more about Next.js, take a look at the following resources:
+How it works: the server keeps each room's full state in Postgres and runs
+the game rules (`lib/game`). After each change it sends a tiny "room changed"
+ping on a public Realtime channel; each browser then fetches its own view,
+which never contains its own unrevealed card. RLS is on with no policies, so
+only the server's secret key can touch the tables.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Commands
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `npm run check`: typecheck, lint, tests
+- `npm run build`: production build
+- `npm run format`: Prettier

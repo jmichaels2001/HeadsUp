@@ -1,9 +1,7 @@
 "use client"
 
 import {
-  createContext,
   useCallback,
-  useContext,
   useEffect,
   useMemo,
   useState,
@@ -17,33 +15,31 @@ import {
   getViewerState,
   isRoomFull,
   MAX_PLAYERS,
-  type Answer,
   type GameAction,
-  type GameSettings,
   type GameState,
-  type MediaState,
   type PlayerId,
-  type ViewerState,
-  type Vote,
 } from "@/lib/game"
 
-import { BUILT_IN_DECKS, findDeck } from "./decks"
+import { BUILT_IN_DECKS, findDeck } from "@/lib/decks"
+import {
+  RoomContext,
+  type DevOverlay,
+  type RoomContextValue,
+  type VideoOrientation,
+} from "@/lib/room/context"
+
 import {
   makeMockPlayer,
   MOCK_NAMES,
   mockMediaFor,
+  randomRoomCode,
   randomSeed,
-  type VideoOrientation,
 } from "./players"
 
 /**
- * Phase 1 stand-in for the realtime room. Raw GameState lives only here;
- * components get the per-viewer projection via `useRoom().view`.
+ * Phase 1 stand-in for the server: the whole room lives in this browser tab.
+ * Raw GameState lives only here; components get the per-viewer projection.
  */
-
-export type DevOverlay = "none" | "loading" | "error" | "reconnecting"
-
-export type JoinResult = "ok" | "full"
 
 interface Stored {
   game: GameState | null
@@ -54,46 +50,6 @@ interface Stored {
 // Bump the version when the stored GameState shape changes.
 const STORAGE_KEY = "headbands:mock-room:v2"
 const EMPTY: Stored = { game: null, viewerId: null, orientations: {} }
-
-export interface RoomContextValue {
-  /** False until stored state has been read on the client. */
-  ready: boolean
-  view: ViewerState | null
-  overlay: DevOverlay
-  videoOrientation: (playerId: PlayerId) => VideoOrientation
-  session: {
-    createRoom: (code: string, name: string, media: MediaState) => void
-    joinRoom: (code: string, name: string, media: MediaState) => JoinResult
-    leaveRoom: () => void
-  }
-  actions: {
-    selectCategory: (categoryId: string) => void
-    updateSettings: (settings: Partial<GameSettings>) => void
-    startRound: () => void
-    askQuestion: (question: string) => void
-    answerQuestion: (answer: Answer) => void
-    questionAnswered: () => void
-    makeGuess: (text: string) => void
-    castVote: (vote: Vote) => void
-    endRound: () => void
-    nextRound: () => void
-    backToLobby: () => void
-    setMedia: (media: Partial<MediaState>) => void
-  }
-  dev: {
-    setViewer: (playerId: PlayerId) => void
-    loadScenario: (playerCount: number, phase: "lobby" | "playing") => void
-    addMockPlayer: () => void
-    removePlayer: (playerId: PlayerId) => void
-    fillVotes: (vote: Vote) => void
-    fillAnswers: (answer: Answer) => void
-    setOverlay: (overlay: DevOverlay) => void
-    toggleOrientation: (playerId: PlayerId) => void
-    reset: () => void
-  }
-}
-
-const RoomContext = createContext<RoomContextValue | null>(null)
 
 function loadStored(): Stored {
   try {
@@ -149,27 +105,42 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
   const value = useMemo<RoomContextValue>(() => {
     const by = viewerId ?? ""
     const view = game && viewerId ? getViewerState(game, viewerId) : null
+    const delay = () => new Promise((r) => setTimeout(r, 700))
 
     return {
+      backend: "mock",
       ready,
+      status: !ready ? "loading" : view?.you ? "ready" : "notSeated",
       view,
+      reconnecting: false,
       overlay,
+      setOverlay,
       videoOrientation: (id) => stored.orientations[id] ?? "landscape",
       session: {
-        createRoom: (code, name, media) => {
-          const you = { ...makeMockPlayer(name, Date.now()), media }
+        createRoom: async (name, media) => {
+          await delay()
+          const code = randomRoomCode()
+          const you = {
+            ...makeMockPlayer(name, Date.now()),
+            media: { ...media, connection: "good" as const },
+          }
           const room = createRoom(code, you, BUILT_IN_DECKS[0])
           setStored((s) => ({
             ...withOrientations(s, room),
             viewerId: you.id,
           }))
+          return { ok: true, code }
         },
-        joinRoom: (code, name, media) => {
+        joinRoom: async (code, name, media) => {
+          await delay()
           // In the mock, any unknown code opens a demo room with friends.
           let room =
             game && game.roomCode === code ? game : seedDemoRoom(code, 3)
           if (isRoomFull(room)) return "full"
-          const you = { ...makeMockPlayer(name, Date.now()), media }
+          const you = {
+            ...makeMockPlayer(name, Date.now()),
+            media: { ...media, connection: "good" as const },
+          }
           room = gameReducer(room, { type: "join", player: you })
           setStored((s) => ({
             ...withOrientations(s, room),
@@ -177,6 +148,10 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
           }))
           return "ok"
         },
+        hasSeat: (code) =>
+          !!game &&
+          game.roomCode === code &&
+          game.players.some((p) => p.id === viewerId),
         leaveRoom: () => {
           setStored((s) =>
             s.game && s.viewerId
@@ -281,6 +256,8 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
             return { ...s, game }
           })
         },
+        setConnection: (connection) =>
+          dispatch({ type: "setMedia", playerId: by, media: { connection } }),
         fillAnswers: (answer) => {
           setStored((s) => {
             const round = s.game?.round
@@ -302,7 +279,6 @@ export function MockRoomProvider({ children }: { children: ReactNode }) {
             return { ...s, game }
           })
         },
-        setOverlay,
         toggleOrientation: (id) =>
           setStored((s) => ({
             ...s,
@@ -342,10 +318,4 @@ function seedDemoRoom(code: string, count: number): GameState {
     room = gameReducer(room, { type: "join", player })
   }
   return room
-}
-
-export function useRoom(): RoomContextValue {
-  const ctx = useContext(RoomContext)
-  if (!ctx) throw new Error("useRoom must be used inside MockRoomProvider")
-  return ctx
 }

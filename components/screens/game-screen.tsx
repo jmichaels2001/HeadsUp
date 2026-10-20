@@ -8,7 +8,7 @@ import { MockVideo } from "@/components/game/mock-video"
 import { PlayerTile } from "@/components/game/player-tile"
 import { Button } from "@/components/ui/button"
 import type { ViewerPlayer, ViewerState } from "@/lib/game"
-import { useRoom } from "@/lib/mock/room-provider"
+import { useRoom } from "@/lib/room"
 
 import { ActionBar } from "./action-bar"
 import { RoomHeader } from "./room-header"

@@ -8,7 +8,7 @@ import { useState } from "react"
 import { PlayerAvatar } from "@/components/game/player-avatar"
 import { Button } from "@/components/ui/button"
 import { MAX_PLAYERS, type ConnectionStatus } from "@/lib/game"
-import { useRoom, type DevOverlay } from "@/lib/mock/room-provider"
+import { useRoom, type DevOverlay } from "@/lib/room"
 
 const OVERLAYS: DevOverlay[] = ["none", "loading", "error", "reconnecting"]
 const CONNECTIONS: ConnectionStatus[] = [
@@ -25,7 +25,8 @@ const CONNECTIONS: ConnectionStatus[] = [
  */
 export function DevPanel() {
   const router = useRouter()
-  const { view, dev, actions, overlay, videoOrientation } = useRoom()
+  const { backend, view, dev, actions, overlay, setOverlay, videoOrientation } =
+    useRoom()
   const [open, setOpen] = useState(false)
 
   if (!open) {
@@ -47,7 +48,7 @@ export function DevPanel() {
   const typedQuestion = turn?.kind === "asking" && turn.question.mode === "type"
 
   function load(count: number, phase: "lobby" | "playing") {
-    dev.loadScenario(count, phase)
+    dev?.loadScenario(count, phase)
     router.push(`/room/${view?.roomCode ?? "DEMO1"}`)
   }
 
@@ -71,36 +72,44 @@ export function DevPanel() {
       </div>
 
       <div className="flex flex-col gap-4 overflow-y-auto p-3">
-        <Section title="Load scenario">
-          <div className="grid grid-cols-4 gap-1.5">
-            {[2, 4, 6, 8].map((n) => (
-              <Button
-                key={`p${n}`}
-                size="sm"
-                onClick={() => load(n, "playing")}
-              >
-                {n}
-              </Button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Players, round in progress. Lobby:
+        {!dev && (
+          <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">
+            Server mode ({backend}): real rooms. Open another browser window (or
+            a private one) and join to add players.
           </p>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[2, 4, 6, 8].map((n) => (
-              <Button
-                key={`l${n}`}
-                size="sm"
-                variant="outline"
-                onClick={() => load(n, "lobby")}
-              >
-                {n}
-              </Button>
-            ))}
-          </div>
-        </Section>
+        )}
+        {dev && (
+          <Section title="Load scenario">
+            <div className="grid grid-cols-4 gap-1.5">
+              {[2, 4, 6, 8].map((n) => (
+                <Button
+                  key={`p${n}`}
+                  size="sm"
+                  onClick={() => load(n, "playing")}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Players, round in progress. Lobby:
+            </p>
+            <div className="grid grid-cols-4 gap-1.5">
+              {[2, 4, 6, 8].map((n) => (
+                <Button
+                  key={`l${n}`}
+                  size="sm"
+                  variant="outline"
+                  onClick={() => load(n, "lobby")}
+                >
+                  {n}
+                </Button>
+              ))}
+            </div>
+          </Section>
+        )}
 
-        {view && (
+        {dev && view && (
           <Section title="View as player">
             <ul className="flex flex-col gap-1">
               {view.players.map((p, i) => (
@@ -159,7 +168,7 @@ export function DevPanel() {
           </Section>
         )}
 
-        {voting && (
+        {dev && voting && (
           <Section title="Fill other votes">
             <div className="grid grid-cols-2 gap-1.5">
               <Button
@@ -180,7 +189,7 @@ export function DevPanel() {
           </Section>
         )}
 
-        {typedQuestion && (
+        {dev && typedQuestion && (
           <Section title="Fill other answers">
             <div className="grid grid-cols-2 gap-1.5">
               <Button
@@ -221,32 +230,32 @@ export function DevPanel() {
                 Cam {view.you.media.camera ? "on" : "off"}
               </Button>
             </div>
-            <Segmented
-              value={view.you.media.connection}
-              options={CONNECTIONS}
-              onChange={(connection) => actions.setMedia({ connection })}
-            />
+            {dev && (
+              <Segmented
+                value={view.you.media.connection}
+                options={CONNECTIONS}
+                onChange={dev.setConnection}
+              />
+            )}
           </Section>
         )}
 
         <Section title="Force screen state">
-          <Segmented
-            value={overlay}
-            options={OVERLAYS}
-            onChange={dev.setOverlay}
-          />
+          <Segmented value={overlay} options={OVERLAYS} onChange={setOverlay} />
         </Section>
 
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            dev.reset()
-            router.push("/")
-          }}
-        >
-          Reset everything
-        </Button>
+        {dev && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              dev.reset()
+              router.push("/")
+            }}
+          >
+            Reset everything
+          </Button>
+        )}
       </div>
     </aside>
   )

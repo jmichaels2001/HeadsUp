@@ -13,7 +13,7 @@ export const MOCK_NAMES = [
   "Ivy",
 ]
 
-export type VideoOrientation = "landscape" | "portrait"
+export type { VideoOrientation } from "@/lib/room/context"
 
 export function randomId(prefix = "p"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`
@@ -29,13 +29,6 @@ export function randomRoomCode(): string {
 
 export function randomSeed(): number {
   return Math.floor(Math.random() * 2 ** 31)
-}
-
-export function normalizeRoomCode(raw: string): string {
-  return raw
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .slice(0, 6)
 }
 
 export function makeMockPlayer(

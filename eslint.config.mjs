@@ -24,6 +24,29 @@ const eslintConfig = defineConfig([
             "@livekit/*",
             "@/components/*",
             "@/lib/mock/*",
+            "@/lib/server",
+            "@/lib/server/*",
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Server-only code (secret keys, DB access) must never reach the browser.
+    files: [
+      "components/**/*.{ts,tsx}",
+      "lib/room/**/*.{ts,tsx}",
+      "lib/mock/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/lib/server", "@/lib/server/*"],
+              message: "Server-only module.",
+            },
           ],
         },
       ],

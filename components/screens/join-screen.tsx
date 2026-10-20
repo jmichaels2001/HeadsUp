@@ -3,31 +3,44 @@
 import { ArrowLeft, Mic, MicOff, Video, VideoOff } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useEffect, useRef, useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 
 import { MockVideo } from "@/components/game/mock-video"
 import { StatusScreen } from "@/components/game/status-screen"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { MediaState } from "@/lib/game"
-import { useRoom } from "@/lib/mock/room-provider"
+import { useRoom } from "@/lib/room"
+import { isValidRoomCode } from "@/lib/room/protocol"
 
 import { AppHeader } from "./app-header"
 
-type Step = "name" | "media" | "joining" | "full"
+type Step = "name" | "media" | "joining" | JoinFailure
+type JoinFailure = "full" | "notFound" | "error"
 type Permission = "prompt" | "granted" | "denied"
 
 const MAX_NAME = 20
 
-export function JoinScreen({
-  code,
-  creating,
-}: {
-  code: string
-  creating: boolean
-}) {
+const FAILURES: Record<JoinFailure, { title: string; description: string }> = {
+  full: {
+    title: "This room is full",
+    description: "Rooms fit up to 8 players. Ask the host to start a new room.",
+  },
+  notFound: {
+    title: "Room not found",
+    description:
+      "Check the code with your friends. Rooms disappear if everyone leaves.",
+  },
+  error: {
+    title: "Couldn't connect",
+    description: "Something went wrong reaching the game. Try again.",
+  },
+}
+
+/** Name + camera check, then create a room (no code) or join `code`. */
+export function JoinScreen({ code }: { code?: string }) {
+  const creating = !code
   const router = useRouter()
-  const { session } = useRoom()
+  const { ready, session } = useRoom()
   const [step, setStep] = useState<Step>("name")
   const [name, setName] = useState("")
   const [nameError, setNameError] = useState<string | null>(null)
@@ -35,29 +48,30 @@ export function JoinScreen({
   const [mic, setMic] = useState(true)
   const [camera, setCamera] = useState(true)
 
-  const valid = /^[A-Z0-9]{4,6}$/.test(code)
+  const valid = creating || isValidRoomCode(code)
+  const alreadySeated = ready && !!code && session.hasSeat(code)
 
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  useEffect(() => () => clearTimeout(timer.current ?? undefined), [])
+  // Back on the join page for a room you're already in: go straight there.
+  useEffect(() => {
+    if (alreadySeated && step === "name") router.replace(`/room/${code}`)
+  }, [alreadySeated, step, code, router])
 
-  function join() {
+  async function join() {
     setStep("joining")
-    const media: MediaState = {
+    const media = {
       mic: permission === "granted" && mic,
       camera: permission === "granted" && camera,
-      connection: "good",
     }
     const trimmed = name.trim()
-    // Simulated network delay so the loading state is visible.
-    timer.current = setTimeout(() => {
-      if (creating) {
-        session.createRoom(code, trimmed, media)
-      } else if (session.joinRoom(code, trimmed, media) === "full") {
-        setStep("full")
-        return
-      }
-      router.replace(`/room/${code}`)
-    }, 700)
+    if (creating) {
+      const res = await session.createRoom(trimmed, media)
+      if (res.ok) router.replace(`/room/${res.code}`)
+      else setStep("error")
+      return
+    }
+    const res = await session.joinRoom(code, trimmed, media)
+    if (res === "ok") router.replace(`/room/${code}`)
+    else setStep(res)
   }
 
   if (!valid) {
@@ -79,29 +93,38 @@ export function JoinScreen({
     )
   }
 
-  if (step === "joining") {
+  if (step === "joining" || alreadySeated) {
     return (
       <main className="flex flex-1 items-center px-4 py-10">
         <StatusScreen
           kind="loading"
           title={creating ? "Creating your room…" : "Joining room…"}
-          description={`Room ${code}`}
+          description={code ? `Room ${code}` : undefined}
         />
       </main>
     )
   }
 
-  if (step === "full") {
+  if (step in FAILURES) {
+    const failure = FAILURES[step as JoinFailure]
     return (
       <>
         <AppHeader />
         <main className="flex flex-1 items-center px-4 py-10">
           <StatusScreen
             kind="error"
-            title="This room is full"
-            description="Rooms fit up to 8 players. Ask the host to start a new room."
+            title={failure.title}
+            description={failure.description}
           >
-            <Link href="/" className={buttonVariants()}>
+            {step === "error" && (
+              <Button onClick={() => void join()}>Try again</Button>
+            )}
+            <Link
+              href="/"
+              className={buttonVariants({
+                variant: step === "error" ? "outline" : "default",
+              })}
+            >
               Back home
             </Link>
           </StatusScreen>
@@ -127,9 +150,15 @@ export function JoinScreen({
           <p className="text-sm font-bold tracking-wide text-muted-foreground uppercase">
             {creating ? "New room" : "Joining room"}
           </p>
-          <p className="font-heading text-4xl font-bold tracking-[0.2em] text-ink">
-            {code}
-          </p>
+          {creating ? (
+            <p className="font-heading text-4xl font-bold text-ink">
+              Start a game
+            </p>
+          ) : (
+            <p className="font-heading text-4xl font-bold tracking-[0.2em] text-ink">
+              {code}
+            </p>
+          )}
         </div>
 
         {step === "name" ? (
@@ -245,7 +274,7 @@ export function JoinScreen({
               size="lg"
               variant="secondary"
               disabled={permission === "prompt"}
-              onClick={join}
+              onClick={() => void join()}
             >
               {creating ? "Create room" : "Join room"}
             </Button>

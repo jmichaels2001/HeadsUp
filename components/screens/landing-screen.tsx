@@ -6,7 +6,7 @@ import { useState, type FormEvent } from "react"
 import { CardSlot, SecretCard } from "@/components/game/secret-card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { normalizeRoomCode, randomRoomCode } from "@/lib/mock/players"
+import { normalizeRoomCode } from "@/lib/room/protocol"
 
 import { AppHeader } from "./app-header"
 
@@ -57,7 +57,7 @@ export function LandingScreen() {
             <Button
               size="xl"
               className="w-full"
-              onClick={() => router.push(`/join/${randomRoomCode()}?create=1`)}
+              onClick={() => router.push("/create")}
             >
               Create a room
             </Button>

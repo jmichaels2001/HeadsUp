@@ -17,7 +17,7 @@ import { useState, type FormEvent, type ReactNode } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import type { QuestionMode, ViewerState } from "@/lib/game"
-import { useRoom } from "@/lib/mock/room-provider"
+import { useRoom } from "@/lib/room"
 
 import { nameOf, playerById } from "./game-screen"
 
