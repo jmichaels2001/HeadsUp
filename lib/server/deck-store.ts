@@ -1,5 +1,12 @@
 import type { CardRecord, DeckRecord } from "@/lib/custom-decks/deck-view"
-import type { DeckMeta } from "@/lib/custom-decks/protocol"
+import type { DeckMeta, LibrarySort } from "@/lib/custom-decks/protocol"
+
+export interface LibraryQuery {
+  /** Case-insensitive name search. */
+  query: string
+  sort: LibrarySort
+  limit: number
+}
 
 export interface CardPatch {
   label?: string
@@ -20,6 +27,12 @@ export interface DeckStore {
   deleteDeck(id: string): Promise<void>
   /** Decks this device created or added cards to, newest first. */
   listDecksForDevice(deviceId: string): Promise<DeckRecord[]>
+  /** Visible decks for the library (card counts are checked by the caller). */
+  listVisibleDecks(query: LibraryQuery): Promise<DeckRecord[]>
+  listHiddenDecks(): Promise<DeckRecord[]>
+  getDecks(ids: string[]): Promise<DeckRecord[]>
+  setHidden(id: string, hidden: boolean): Promise<void>
+  incrementPlayCount(id: string): Promise<void>
   getCards(deckId: string): Promise<CardRecord[]>
   /** Card counts per deck, by creator. */
   getCardCreators(deckIds: string[]): Promise<Record<string, string[]>>
@@ -76,6 +89,42 @@ export class MemoryDeckStore implements DeckStore {
       .filter((d) => d.createdBy === deviceId || withMyCards.has(d.id))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map((d) => structuredClone(d))
+  }
+
+  async listVisibleDecks({ query, sort, limit }: LibraryQuery) {
+    const needle = query.trim().toLowerCase()
+    return [...this.decks.values()]
+      .filter((d) => !d.hidden && d.name.toLowerCase().includes(needle))
+      .sort((a, b) =>
+        sort === "popular"
+          ? b.playCount - a.playCount || b.createdAt - a.createdAt
+          : b.createdAt - a.createdAt,
+      )
+      .slice(0, limit)
+      .map((d) => structuredClone(d))
+  }
+
+  async listHiddenDecks() {
+    return [...this.decks.values()]
+      .filter((d) => d.hidden)
+      .map((d) => structuredClone(d))
+  }
+
+  async getDecks(ids: string[]) {
+    return ids.flatMap((id) => {
+      const deck = this.decks.get(id)
+      return deck ? [structuredClone(deck)] : []
+    })
+  }
+
+  async setHidden(id: string, hidden: boolean) {
+    const deck = this.decks.get(id)
+    if (deck) this.decks.set(id, { ...deck, hidden })
+  }
+
+  async incrementPlayCount(id: string) {
+    const deck = this.decks.get(id)
+    if (deck) this.decks.set(id, { ...deck, playCount: deck.playCount + 1 })
   }
 
   async getCards(deckId: string) {

@@ -45,6 +45,12 @@ export function LandingScreen() {
     <>
       <AppHeader>
         <Link
+          href="/library"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          Library
+        </Link>
+        <Link
           href="/decks"
           className={buttonVariants({ variant: "ghost", size: "sm" })}
         >

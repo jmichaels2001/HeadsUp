@@ -56,6 +56,7 @@ export function getDeckView(
     totalCardCount: cards.length,
     playable: isPlayable(cards.length),
     canDelete: mine.length === cards.length,
+    hidden: deck.hidden,
   }
 }
 

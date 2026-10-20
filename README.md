@@ -28,7 +28,7 @@ private window, or a phone). Two tabs in the same profile share a seat.
 1. In the Supabase dashboard, open **SQL Editor** and run each file in
    `supabase/migrations/` once, in order (`0001_rooms.sql`, then
    `0002_decks.sql`, which also creates the public `card-images` storage
-   bucket).
+   bucket, then `0003_reports.sql`).
 2. Under **Project Settings → API Keys**, copy the project URL, the
    **publishable** key, and a **secret** key into `.env.local`:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
@@ -64,6 +64,13 @@ with your player id as your identity, so each feed lands in the right tile.
 The call carries only camera and mic; no game data, and nothing is recorded
 (egress is never used). Camera access needs HTTPS or `localhost`, so to test
 on a phone use a Vercel preview deploy.
+
+## Deck moderation
+
+Reported decks are reviewed at `/admin`. Set `ADMIN_SECRET` (server only) in
+`.env.local` and in Vercel, then sign in at `/admin` with it. Without it,
+`/admin` is off. Decks reported from 3 different browsers are hidden from the
+library automatically until you dismiss the reports or unhide them.
 
 ## Commands
 

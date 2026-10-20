@@ -29,6 +29,7 @@ import {
 import type { Card } from "@/lib/game"
 
 import { CardImageField } from "./card-image-field"
+import { ReportDeck } from "./report-deck"
 
 const EMPTY_META: DeckMeta = { name: "", emoji: "🃏", description: "" }
 
@@ -99,6 +100,16 @@ export function DeckEditor({ deckId }: { deckId?: string }) {
         <h1 className="text-title font-bold">
           {view ? "Edit deck" : "New deck"}
         </h1>
+        {view?.hidden && (
+          <p
+            role="status"
+            className="rounded-xl border-2 border-ink bg-destructive-soft p-3 text-sm font-semibold"
+          >
+            Hidden while under review: this deck was reported, so it&apos;s out
+            of the library and can&apos;t be picked in rooms until a moderator
+            looks at it.
+          </p>
+        )}
         <MetaForm
           key={view ? `${view.id}:${view.version}` : "new"}
           view={view}
@@ -109,7 +120,10 @@ export function DeckEditor({ deckId }: { deckId?: string }) {
         {view && (
           <>
             <CardsSection view={view} onChange={setView} />
-            <DeleteDeck view={view} onDeleted={() => router.push("/decks")} />
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <DeleteDeck view={view} onDeleted={() => router.push("/decks")} />
+              <ReportDeck deckId={view.id} name={view.name} />
+            </div>
           </>
         )}
       </main>

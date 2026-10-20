@@ -5,6 +5,10 @@ import { Check, ExternalLink, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 
+import {
+  LibraryBrowser,
+  libraryDetail,
+} from "@/components/decks/library-browser"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { deckApi } from "@/lib/custom-decks/client"
 import {
@@ -18,7 +22,7 @@ import { useRoom } from "@/lib/room"
 const BUILT_IN = getDeckSummaries()
 const isBuiltIn = (id: string | undefined) => BUILT_IN.some((d) => d.id === id)
 
-type Tab = "builtIn" | "mine"
+type Tab = "builtIn" | "library" | "mine"
 
 /** The lobby's category picker: built-in decks and the host's own decks. */
 export function DeckPicker({ view }: { view: ViewerState }) {
@@ -42,11 +46,12 @@ export function DeckPicker({ view }: { view: ViewerState }) {
         <div
           role="tablist"
           aria-label="Deck source"
-          className="mb-4 grid grid-cols-2 gap-1 rounded-xl border-2 border-ink bg-muted p-1"
+          className="mb-4 grid grid-cols-3 gap-1 rounded-xl border-2 border-ink bg-muted p-1"
         >
           {(
             [
               ["builtIn", "Built-in"],
+              ["library", "Library"],
               ["mine", "My decks"],
             ] as const
           ).map(([id, label]) => (
@@ -95,8 +100,23 @@ export function DeckPicker({ view }: { view: ViewerState }) {
         </DeckGrid>
       ) : backend === "mock" ? (
         <p className="rounded-xl bg-muted p-3 text-sm font-semibold">
-          Your own decks need server mode.
+          Custom decks need server mode.
         </p>
+      ) : tab === "library" ? (
+        <LibraryBrowser
+          label="Category"
+          renderItem={(item) => (
+            <DeckTile
+              emoji={item.emoji}
+              name={item.name}
+              description={item.description}
+              detail={libraryDetail(item)}
+              warn={item.cardCount < view.players.length}
+              selected={selectedId === item.id}
+              onSelect={() => actions.selectCategory(item.id)}
+            />
+          )}
+        />
       ) : (
         <MyDecks view={view} onSelect={(id) => actions.selectCategory(id)} />
       )}
@@ -172,13 +192,15 @@ function MyDecks({
               name={deck.name}
               description={deck.description}
               detail={
-                deck.playable
-                  ? `${deck.totalCardCount} cards · ${deck.myCardCount} yours`
-                  : `Draft: ${deck.totalCardCount}/${MIN_PLAYABLE_CARDS} cards`
+                deck.hidden
+                  ? "Under review"
+                  : deck.playable
+                    ? `${deck.totalCardCount} cards · ${deck.myCardCount} yours`
+                    : `Draft: ${deck.totalCardCount}/${MIN_PLAYABLE_CARDS} cards`
               }
-              warn={!deck.playable}
+              warn={!deck.playable || deck.hidden}
               selected={view.category?.id === deck.id}
-              disabled={!deck.playable}
+              disabled={!deck.playable || deck.hidden}
               onSelect={() => onSelect(deck.id)}
             />
           ))}
@@ -234,7 +256,7 @@ function DeckTile({
       disabled={disabled}
       onClick={onSelect}
       className={cn(
-        "flex items-start gap-3 rounded-xl border-2 border-ink p-3 text-left transition-colors outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-default",
+        "flex w-full items-start gap-3 rounded-xl border-2 border-ink p-3 text-left transition-colors outline-none focus-visible:ring-4 focus-visible:ring-ring/40 disabled:cursor-default",
         selected
           ? "bg-secondary shadow-pop-sm"
           : "bg-background enabled:hover:bg-muted",

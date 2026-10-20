@@ -2,12 +2,14 @@ import "server-only"
 
 import { createClient } from "@supabase/supabase-js"
 
+import { AdminService } from "./admin-service"
 import { DeckService } from "./deck-service"
-import { MemoryDeckStore } from "./deck-store"
+import { MemoryDeckStore, type DeckStore } from "./deck-store"
 import { MemoryImageStore, SupabaseImageStore } from "./image-store"
 import { RoomService, type VideoConfig } from "./room-service"
 import { MemoryRoomStore } from "./store"
-import { SupabaseDeckStore } from "./supabase-deck-store"
+import { MemoryReportStore, type ReportStore } from "./report-store"
+import { SupabaseDeckStore, SupabaseReportStore } from "./supabase-deck-store"
 import { SupabaseRoomStore, supabaseNotifier } from "./supabase-store"
 
 export { RoomError } from "./room-service"
@@ -15,6 +17,8 @@ export { RoomError } from "./room-service"
 const globalForRooms = globalThis as unknown as {
   headbandsRoomService?: RoomService
   headbandsDeckService?: DeckService
+  headbandsAdminService?: AdminService
+  headbandsDeckStores?: { decks: DeckStore; reports: ReportStore }
   headbandsMemoryImages?: MemoryImageStore
 }
 
@@ -37,12 +41,14 @@ export function getRoomService(): RoomService {
       notify: supabaseNotifier(db),
       video: videoConfig(),
       loadDeck: (id) => getDeckService().loadForRoom(id),
+      onRoundStart: (id) => getDeckService().recordPlay(id),
     })
   } else if (process.env.NODE_ENV !== "production") {
     service = new RoomService({
       store: new MemoryRoomStore(),
       video: videoConfig(),
       loadDeck: (id) => getDeckService().loadForRoom(id),
+      onRoundStart: (id) => getDeckService().recordPlay(id),
     })
   } else {
     throw notConfigured()
@@ -59,24 +65,44 @@ export function getDeckService(): DeckService {
   }
 
   const db = supabaseAdmin()
-  let service: DeckService
+  const { decks, reports } = getDeckStores()
+  const service = new DeckService({
+    store: decks,
+    reports,
+    images: db ? new SupabaseImageStore(db) : getMemoryImages(),
+  })
+  globalForRooms.headbandsDeckService = service
+  return service
+}
 
+/** Moderation. Routes must check the admin cookie before using it. */
+export function getAdminService(): AdminService {
+  if (!globalForRooms.headbandsAdminService) {
+    const { decks, reports } = getDeckStores()
+    globalForRooms.headbandsAdminService = new AdminService(decks, reports)
+  }
+  return globalForRooms.headbandsAdminService
+}
+
+/** Shared by the deck and admin services, so memory mode sees one world. */
+function getDeckStores() {
+  if (globalForRooms.headbandsDeckStores) {
+    return globalForRooms.headbandsDeckStores
+  }
+  const db = supabaseAdmin()
+  let stores: { decks: DeckStore; reports: ReportStore }
   if (db) {
-    service = new DeckService({
-      store: new SupabaseDeckStore(db),
-      images: new SupabaseImageStore(db),
-    })
+    stores = {
+      decks: new SupabaseDeckStore(db),
+      reports: new SupabaseReportStore(db),
+    }
   } else if (process.env.NODE_ENV !== "production") {
-    service = new DeckService({
-      store: new MemoryDeckStore(),
-      images: getMemoryImages(),
-    })
+    stores = { decks: new MemoryDeckStore(), reports: new MemoryReportStore() }
   } else {
     throw notConfigured()
   }
-
-  globalForRooms.headbandsDeckService = service
-  return service
+  globalForRooms.headbandsDeckStores = stores
+  return stores
 }
 
 /** Card images for local dev without Supabase; null when Supabase is on. */

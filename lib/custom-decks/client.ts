@@ -9,6 +9,9 @@ import {
   type DeckMeta,
   type DeckView,
   type ImageUploadResponse,
+  type LibraryItem,
+  type LibrarySort,
+  type ReportRequest,
   type UpdateCardRequest,
   type UpdateDeckRequest,
 } from "./protocol"
@@ -51,6 +54,12 @@ const cardPath = (id: string, cardId: string) =>
 
 export const deckApi = {
   listMine: () => request<DeckListItem[]>("/api/decks"),
+  library: (query: string, sort: LibrarySort) =>
+    request<LibraryItem[]>(
+      `/api/decks/library?${new URLSearchParams({ q: query, sort })}`,
+    ),
+  report: (id: string, body: ReportRequest) =>
+    request<{ ok: true }>(`${deckPath(id)}/report`, { method: "POST", body }),
   create: (meta: DeckMeta) =>
     request<DeckView>("/api/decks", { method: "POST", body: meta }),
   get: (id: string) => request<DeckView>(deckPath(id)),

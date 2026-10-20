@@ -78,6 +78,8 @@ export interface RoomServiceDeps {
   video?: VideoConfig | null
   /** Custom decks by id (throws RoomError if it can't be used). */
   loadDeck?: (id: string) => Promise<Category>
+  /** A round started with a custom deck (for play counts). Errors ignored. */
+  onRoundStart?: (categoryId: string) => Promise<void>
 }
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -107,6 +109,7 @@ export class RoomService {
   private playerId: () => string
   private video: VideoConfig | null
   private loadDeck: ((id: string) => Promise<Category>) | null
+  private onRoundStart: (categoryId: string) => Promise<void>
 
   constructor(deps: RoomServiceDeps) {
     this.store = deps.store
@@ -119,6 +122,7 @@ export class RoomService {
       deps.playerId ?? (() => `p_${randomBytes(6).toString("base64url")}`)
     this.video = deps.video ?? null
     this.loadDeck = deps.loadDeck ?? null
+    this.onRoundStart = deps.onRoundStart ?? (async () => {})
   }
 
   async createRoom(input: JoinRequest): Promise<SeatResponse> {
@@ -164,6 +168,15 @@ export class RoomService {
       return next
     })
     if (action.type === "leave") await this.store.removeSeat(code, playerId)
+    const category = result.state.category
+    if (
+      (action.type === "startRound" || action.type === "nextRound") &&
+      result.state.phase === "playing" &&
+      category &&
+      !category.builtIn
+    ) {
+      await this.onRoundStart(category.id).catch(() => {})
+    }
     return this.snapshot(code, result.state, result.version, playerId)
   }
 

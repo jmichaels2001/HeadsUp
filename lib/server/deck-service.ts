@@ -6,8 +6,10 @@ import {
   type CardRecord,
 } from "@/lib/custom-decks/deck-view"
 import {
+  AUTO_HIDE_REPORTS,
   deviceIdSchema,
   isPlayable,
+  LIBRARY_PAGE_SIZE,
   MAX_DECK_CARDS,
   MAX_IMAGE_BYTES,
   normalizeLabel,
@@ -16,6 +18,9 @@ import {
   type DeckMeta,
   type DeckView,
   type ImageUploadResponse,
+  type LibraryItem,
+  type LibrarySort,
+  type ReportRequest,
   type UpdateCardRequest,
   type UpdateDeckRequest,
 } from "@/lib/custom-decks/protocol"
@@ -23,11 +28,13 @@ import type { Category } from "@/lib/game"
 
 import type { DeckStore } from "./deck-store"
 import { imageFileName, sniffImageType, type ImageStore } from "./image-store"
+import type { ReportStore } from "./report-store"
 import { RoomError } from "./room-service"
 
 export interface DeckServiceDeps {
   store: DeckStore
   images: ImageStore
+  reports: ReportStore
   now?: () => number
   id?: (prefix: string) => string
 }
@@ -44,12 +51,14 @@ function defaultId(prefix: string): string {
 export class DeckService {
   private store: DeckStore
   private images: ImageStore
+  private reports: ReportStore
   private now: () => number
   private id: (prefix: string) => string
 
   constructor(deps: DeckServiceDeps) {
     this.store = deps.store
     this.images = deps.images
+    this.reports = deps.reports
     this.now = deps.now ?? Date.now
     this.id = deps.id ?? defaultId
   }
@@ -109,9 +118,67 @@ export class DeckService {
         totalCardCount: cards.length,
         myCardCount: cards.filter((c) => c === device).length,
         playable: isPlayable(cards.length),
+        hidden: d.hidden,
         updatedAt: d.updatedAt,
       }
     })
+  }
+
+  /**
+   * Playable, unhidden decks: names and counts only, never cards. Fetches
+   * extra rows because drafts are filtered out after counting.
+   */
+  async listLibrary(query: string, sort: LibrarySort): Promise<LibraryItem[]> {
+    const decks = await this.store.listVisibleDecks({
+      query: query.slice(0, 100),
+      sort,
+      limit: LIBRARY_PAGE_SIZE * 4,
+    })
+    const creators = await this.store.getCardCreators(decks.map((d) => d.id))
+    return decks
+      .filter((d) => isPlayable(creators[d.id]?.length ?? 0))
+      .slice(0, LIBRARY_PAGE_SIZE)
+      .map((d) => ({
+        id: d.id,
+        name: d.name,
+        emoji: d.emoji,
+        description: d.description,
+        cardCount: creators[d.id].length,
+        playCount: d.playCount,
+        createdAt: d.createdAt,
+      }))
+  }
+
+  /**
+   * One open report per device per deck (a repeat updates it). Enough
+   * reports from different devices hide the deck until a moderator looks.
+   */
+  async report(
+    id: string,
+    deviceId: string,
+    { reason, note = "" }: ReportRequest,
+  ): Promise<{ ok: true }> {
+    const device = checkDevice(deviceId)
+    if (!(await this.store.getDeck(id))) throw notFound()
+    await this.reports.saveOpenReport({
+      id: this.id("r"),
+      deckId: id,
+      deviceId: device,
+      reason,
+      note,
+      status: "open",
+      createdAt: this.now(),
+    })
+    const open = await this.reports.openReports([id])
+    if (new Set(open.map((r) => r.deviceId)).size >= AUTO_HIDE_REPORTS) {
+      await this.store.setHidden(id, true)
+    }
+    return { ok: true }
+  }
+
+  /** A round started with this deck. Failures don't matter to the game. */
+  async recordPlay(id: string): Promise<void> {
+    await this.store.incrementPlayCount(id)
   }
 
   async updateDeck(

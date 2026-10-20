@@ -17,6 +17,10 @@ export const MAX_CARD_LABEL = 60
 /** Uploaded card images (after the browser shrinks them). */
 export const MAX_IMAGE_BYTES = 1024 * 1024
 export const MAX_IMAGE_SIDE = 512
+export const MAX_REPORT_NOTE = 200
+/** Open reports from this many different browsers hide a deck. */
+export const AUTO_HIDE_REPORTS = 3
+export const LIBRARY_PAGE_SIZE = 50
 
 /** Sent on every deck request so the server knows whose cards to return. */
 export const DEVICE_HEADER = "x-device-id"
@@ -49,6 +53,18 @@ export const updateCardSchema = z.strictObject({
 })
 export type UpdateCardRequest = z.infer<typeof updateCardSchema>
 
+export const REPORT_REASONS = ["offensive", "spam", "other"] as const
+export type ReportReason = (typeof REPORT_REASONS)[number]
+
+export const reportSchema = z.strictObject({
+  reason: z.enum(REPORT_REASONS),
+  note: z.string().trim().max(MAX_REPORT_NOTE).default(""),
+})
+export type ReportRequest = z.input<typeof reportSchema>
+
+export const librarySortSchema = z.enum(["newest", "popular"])
+export type LibrarySort = z.infer<typeof librarySortSchema>
+
 /** A deck as one device sees it: shared details, its own cards, a count. */
 export interface DeckView {
   id: string
@@ -62,6 +78,8 @@ export interface DeckView {
   playable: boolean
   /** Only when every remaining card is yours (or there are none). */
   canDelete: boolean
+  /** Hidden from the library while reports are reviewed. */
+  hidden: boolean
 }
 
 export interface DeckListItem {
@@ -72,7 +90,38 @@ export interface DeckListItem {
   totalCardCount: number
   myCardCount: number
   playable: boolean
+  hidden: boolean
   updatedAt: number
+}
+
+/** A library entry: never any cards, just what's needed to pick one. */
+export interface LibraryItem {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  cardCount: number
+  playCount: number
+  createdAt: number
+}
+
+export interface AdminReport {
+  id: string
+  reason: ReportReason
+  note: string
+  createdAt: number
+}
+
+/** Moderators see everything, including every card. */
+export interface AdminDeck {
+  id: string
+  name: string
+  emoji: string
+  description: string
+  hidden: boolean
+  playCount: number
+  cards: { id: string; label: string; imageUrl: string | null }[]
+  reports: AdminReport[]
 }
 
 export interface ImageUploadResponse {

@@ -11,6 +11,7 @@ import {
 
 import { DeckService } from "../deck-service"
 import { MemoryDeckStore } from "../deck-store"
+import { MemoryReportStore } from "../report-store"
 import { MemoryImageStore, sniffImageType } from "../image-store"
 import { RoomError } from "../room-service"
 
@@ -41,6 +42,7 @@ beforeEach(() => {
   service = new DeckService({
     store: new MemoryDeckStore(),
     images,
+    reports: new MemoryReportStore(),
     now: () => clock++,
     id: (prefix) => `${prefix}_${++n}`,
   })

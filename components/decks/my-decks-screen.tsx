@@ -33,6 +33,12 @@ export function MyDecksScreen() {
   return (
     <>
       <AppHeader>
+        <Link
+          href="/library"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          Library
+        </Link>
         <Link href="/decks/new" className={buttonVariants({ size: "sm" })}>
           <Plus />
           New deck
@@ -87,6 +93,11 @@ export function MyDecksScreen() {
                       {deck.totalCardCount} cards · {deck.myCardCount} yours
                     </span>
                   </span>
+                  {deck.hidden && (
+                    <span className="rounded-full border-2 border-ink bg-destructive-soft px-2 py-0.5 text-xs font-bold uppercase">
+                      Under review
+                    </span>
+                  )}
                   {!deck.playable && (
                     <span className="rounded-full border-2 border-ink bg-warning-soft px-2 py-0.5 text-xs font-bold uppercase">
                       Draft

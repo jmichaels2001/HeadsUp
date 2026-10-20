@@ -3,7 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js"
 import type { CardRecord, DeckRecord } from "@/lib/custom-decks/deck-view"
 import type { DeckMeta } from "@/lib/custom-decks/protocol"
 
-import type { CardPatch, DeckStore } from "./deck-store"
+import type { CardPatch, DeckStore, LibraryQuery } from "./deck-store"
+import type { ReportRecord, ReportStatus, ReportStore } from "./report-store"
 
 const DECK_COLUMNS =
   "id, name, emoji, description, created_by, version, play_count, hidden, created_at, updated_at"
@@ -136,6 +137,57 @@ export class SupabaseDeckStore implements DeckStore {
     return (data ?? []).map(toDeck)
   }
 
+  async listVisibleDecks({ query, sort, limit }: LibraryQuery) {
+    let request = this.db.from("decks").select(DECK_COLUMNS).eq("hidden", false)
+    const needle = query.trim().replace(/[\\%_]/g, (c) => `\\${c}`)
+    if (needle) request = request.ilike("name", `%${needle}%`)
+    if (sort === "popular") {
+      request = request.order("play_count", { ascending: false })
+    }
+    const { data, error } = await request
+      .order("created_at", { ascending: false })
+      .limit(limit)
+      .returns<DeckRow[]>()
+    if (error) fail("listVisibleDecks", error)
+    return (data ?? []).map(toDeck)
+  }
+
+  async listHiddenDecks() {
+    const { data, error } = await this.db
+      .from("decks")
+      .select(DECK_COLUMNS)
+      .eq("hidden", true)
+      .returns<DeckRow[]>()
+    if (error) fail("listHiddenDecks", error)
+    return (data ?? []).map(toDeck)
+  }
+
+  async getDecks(ids: string[]) {
+    if (!ids.length) return []
+    const { data, error } = await this.db
+      .from("decks")
+      .select(DECK_COLUMNS)
+      .in("id", ids)
+      .returns<DeckRow[]>()
+    if (error) fail("getDecks", error)
+    return (data ?? []).map(toDeck)
+  }
+
+  async setHidden(id: string, hidden: boolean) {
+    const { error } = await this.db
+      .from("decks")
+      .update({ hidden })
+      .eq("id", id)
+    if (error) fail("setHidden", error)
+  }
+
+  async incrementPlayCount(id: string) {
+    const { error } = await this.db.rpc("increment_deck_play_count", {
+      deck: id,
+    })
+    if (error) fail("incrementPlayCount", error)
+  }
+
   async getCards(deckId: string) {
     const { data, error } = await this.db
       .from("deck_cards")
@@ -191,5 +243,73 @@ export class SupabaseDeckStore implements DeckStore {
       .eq("deck_id", deckId)
       .eq("id", cardId)
     if (error) fail("deleteCard", error)
+  }
+}
+
+interface ReportRow {
+  id: string
+  deck_id: string
+  device_id: string
+  reason: ReportRecord["reason"]
+  note: string
+  status: ReportStatus
+  created_at: string
+}
+
+/** ReportStore backed by the `deck_reports` table (migration 0003). */
+export class SupabaseReportStore implements ReportStore {
+  constructor(private db: SupabaseClient) {}
+
+  async saveOpenReport(report: ReportRecord) {
+    const { data, error } = await this.db
+      .from("deck_reports")
+      .update({ reason: report.reason, note: report.note })
+      .eq("deck_id", report.deckId)
+      .eq("device_id", report.deviceId)
+      .eq("status", "open")
+      .select("id")
+    if (error) fail("saveOpenReport", error)
+    if (data?.length) return
+    const insert = await this.db.from("deck_reports").insert({
+      id: report.id,
+      deck_id: report.deckId,
+      device_id: report.deviceId,
+      reason: report.reason,
+      note: report.note,
+      status: "open",
+      created_at: iso(report.createdAt),
+    })
+    if (insert.error) fail("saveOpenReport", insert.error)
+  }
+
+  async openReports(deckIds?: string[]) {
+    if (deckIds && !deckIds.length) return []
+    let request = this.db
+      .from("deck_reports")
+      .select("id, deck_id, device_id, reason, note, status, created_at")
+      .eq("status", "open")
+    if (deckIds) request = request.in("deck_id", deckIds)
+    const { data, error } = await request
+      .order("created_at", { ascending: true })
+      .returns<ReportRow[]>()
+    if (error) fail("openReports", error)
+    return (data ?? []).map((row): ReportRecord => ({
+      id: row.id,
+      deckId: row.deck_id,
+      deviceId: row.device_id,
+      reason: row.reason,
+      note: row.note,
+      status: row.status,
+      createdAt: Date.parse(row.created_at),
+    }))
+  }
+
+  async closeReports(deckId: string, status: Exclude<ReportStatus, "open">) {
+    const { error } = await this.db
+      .from("deck_reports")
+      .update({ status })
+      .eq("deck_id", deckId)
+      .eq("status", "open")
+    if (error) fail("closeReports", error)
   }
 }
