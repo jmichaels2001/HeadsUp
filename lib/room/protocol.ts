@@ -66,6 +66,12 @@ export interface RoomSnapshot {
 
 export type SeatResponse = Seat & RoomSnapshot
 
+/** Where and how to join the room's video call. */
+export interface VideoTokenResponse {
+  url: string
+  token: string
+}
+
 export type RoomErrorCode =
   | "notFound"
   | "unauthorized"

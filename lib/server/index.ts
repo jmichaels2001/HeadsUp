@@ -2,7 +2,7 @@ import "server-only"
 
 import { createClient } from "@supabase/supabase-js"
 
-import { RoomService } from "./room-service"
+import { RoomService, type VideoConfig } from "./room-service"
 import { MemoryRoomStore } from "./store"
 import { SupabaseRoomStore, supabaseNotifier } from "./supabase-store"
 
@@ -33,9 +33,13 @@ export function getRoomService(): RoomService {
     service = new RoomService({
       store: new SupabaseRoomStore(db),
       notify: supabaseNotifier(db),
+      video: videoConfig(),
     })
   } else if (process.env.NODE_ENV !== "production") {
-    service = new RoomService({ store: new MemoryRoomStore() })
+    service = new RoomService({
+      store: new MemoryRoomStore(),
+      video: videoConfig(),
+    })
   } else {
     throw new Error(
       "Supabase isn't configured: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY.",
@@ -44,4 +48,12 @@ export function getRoomService(): RoomService {
 
   globalForRooms.headbandsRoomService = service
   return service
+}
+
+/** LiveKit Cloud credentials, or null to run without video. */
+function videoConfig(): VideoConfig | null {
+  const url = process.env.LIVEKIT_URL
+  const apiKey = process.env.LIVEKIT_API_KEY
+  const apiSecret = process.env.LIVEKIT_API_SECRET
+  return url && apiKey && apiSecret ? { url, apiKey, apiSecret } : null
 }

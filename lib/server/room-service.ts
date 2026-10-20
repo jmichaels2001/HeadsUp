@@ -1,5 +1,7 @@
 import { createHash, randomBytes } from "node:crypto"
 
+import { AccessToken } from "livekit-server-sdk"
+
 import { BUILT_IN_DECKS, findDeck } from "@/lib/decks"
 import {
   createRoom,
@@ -18,6 +20,7 @@ import type {
   RoomErrorCode,
   RoomSnapshot,
   SeatResponse,
+  VideoTokenResponse,
 } from "@/lib/room/protocol"
 
 import type { RoomStore } from "./store"
@@ -51,6 +54,15 @@ export const STALE_AFTER_MS = 120_000
 /** Players silent for longer than this show as offline. */
 export const OFFLINE_AFTER_MS = 40_000
 const MAX_RETRIES = 5
+/** Video tokens only need to outlast a session's reconnects. */
+export const VIDEO_TOKEN_TTL = "6h"
+
+/** LiveKit Cloud project credentials (server-side only). */
+export interface VideoConfig {
+  url: string
+  apiKey: string
+  apiSecret: string
+}
 
 export interface RoomServiceDeps {
   store: RoomStore
@@ -61,6 +73,8 @@ export interface RoomServiceDeps {
   token?: () => string
   roomCode?: () => string
   playerId?: () => string
+  /** Omit to run without video; video tokens are then "unavailable". */
+  video?: VideoConfig | null
 }
 
 const CODE_LETTERS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -88,6 +102,7 @@ export class RoomService {
   private token: () => string
   private roomCode: () => string
   private playerId: () => string
+  private video: VideoConfig | null
 
   constructor(deps: RoomServiceDeps) {
     this.store = deps.store
@@ -98,6 +113,7 @@ export class RoomService {
     this.roomCode = deps.roomCode ?? defaultRoomCode
     this.playerId =
       deps.playerId ?? (() => `p_${randomBytes(6).toString("base64url")}`)
+    this.video = deps.video ?? null
   }
 
   async createRoom(input: JoinRequest): Promise<SeatResponse> {
@@ -144,6 +160,34 @@ export class RoomService {
     })
     if (action.type === "leave") await this.store.removeSeat(code, playerId)
     return this.snapshot(code, result.state, result.version, playerId)
+  }
+
+  /**
+   * A LiveKit token for this player: the call is named after the room code
+   * and the participant identity is the player id, so feeds map onto tiles.
+   */
+  async videoToken(code: string, token: string): Promise<VideoTokenResponse> {
+    const playerId = await this.authenticate(code, token)
+    if (!this.video) {
+      throw new RoomError("unavailable", "Video isn't set up for this game.")
+    }
+    const room = await this.store.getRoom(code)
+    const player = room?.state.players.find((p) => p.id === playerId)
+    if (!player) throw new RoomError("unauthorized", "You're not in this room.")
+
+    const at = new AccessToken(this.video.apiKey, this.video.apiSecret, {
+      identity: playerId,
+      name: player.name,
+      ttl: VIDEO_TOKEN_TTL,
+    })
+    at.addGrant({
+      room: code,
+      roomJoin: true,
+      canPublish: true,
+      canSubscribe: true,
+      canPublishData: false,
+    })
+    return { url: this.video.url, token: await at.toJwt() }
   }
 
   /** Keeps the seat alive and removes players who have gone silent. */
