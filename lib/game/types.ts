@@ -25,7 +25,11 @@ export interface Player {
 export interface Card {
   id: CardId
   label: string
+  /** Built-in decks use emojis; custom cards use images. */
   emoji?: string
+  imageUrl?: string
+  /** Device id of the browser that added a custom card. */
+  createdBy?: string
 }
 
 export type CategoryVisibility = "private" | "room" | "public"

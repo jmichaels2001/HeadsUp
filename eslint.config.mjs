@@ -38,6 +38,7 @@ const eslintConfig = defineConfig([
       "lib/room/**/*.{ts,tsx}",
       "lib/mock/**/*.{ts,tsx}",
       "lib/video/**/*.{ts,tsx}",
+      "lib/custom-decks/**/*.{ts,tsx}",
     ],
     rules: {
       "no-restricted-imports": [

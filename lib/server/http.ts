@@ -3,6 +3,7 @@ import "server-only"
 import { NextResponse } from "next/server"
 import type { z } from "zod"
 
+import { DEVICE_HEADER } from "@/lib/custom-decks/protocol"
 import type { ApiError } from "@/lib/room/protocol"
 
 import { RoomError } from "./room-service"
@@ -29,6 +30,11 @@ export async function handle<T>(fn: () => Promise<T>): Promise<NextResponse> {
 export function bearerToken(req: Request): string {
   const header = req.headers.get("authorization") ?? ""
   return header.startsWith("Bearer ") ? header.slice(7).trim() : ""
+}
+
+/** The caller's device id; DeckService validates it. */
+export function deviceId(req: Request): string {
+  return req.headers.get(DEVICE_HEADER) ?? ""
 }
 
 export async function parseBody<S extends z.ZodType>(

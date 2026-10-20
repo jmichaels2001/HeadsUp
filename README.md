@@ -25,8 +25,10 @@ private window, or a phone). Two tabs in the same profile share a seat.
 
 ## Supabase setup (real rooms)
 
-1. In the Supabase dashboard, open **SQL Editor** and run
-   `supabase/migrations/0001_rooms.sql` once.
+1. In the Supabase dashboard, open **SQL Editor** and run each file in
+   `supabase/migrations/` once, in order (`0001_rooms.sql`, then
+   `0002_decks.sql`, which also creates the public `card-images` storage
+   bucket).
 2. Under **Project Settings → API Keys**, copy the project URL, the
    **publishable** key, and a **secret** key into `.env.local`:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,

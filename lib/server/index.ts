@@ -2,14 +2,20 @@ import "server-only"
 
 import { createClient } from "@supabase/supabase-js"
 
+import { DeckService } from "./deck-service"
+import { MemoryDeckStore } from "./deck-store"
+import { MemoryImageStore, SupabaseImageStore } from "./image-store"
 import { RoomService, type VideoConfig } from "./room-service"
 import { MemoryRoomStore } from "./store"
+import { SupabaseDeckStore } from "./supabase-deck-store"
 import { SupabaseRoomStore, supabaseNotifier } from "./supabase-store"
 
 export { RoomError } from "./room-service"
 
 const globalForRooms = globalThis as unknown as {
   headbandsRoomService?: RoomService
+  headbandsDeckService?: DeckService
+  headbandsMemoryImages?: MemoryImageStore
 }
 
 /**
@@ -22,14 +28,10 @@ export function getRoomService(): RoomService {
     return globalForRooms.headbandsRoomService
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const secret = process.env.SUPABASE_SECRET_KEY
+  const db = supabaseAdmin()
   let service: RoomService
 
-  if (url && secret) {
-    const db = createClient(url, secret, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    })
+  if (db) {
     service = new RoomService({
       store: new SupabaseRoomStore(db),
       notify: supabaseNotifier(db),
@@ -41,13 +43,63 @@ export function getRoomService(): RoomService {
       video: videoConfig(),
     })
   } else {
-    throw new Error(
-      "Supabase isn't configured: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY.",
-    )
+    throw notConfigured()
   }
 
   globalForRooms.headbandsRoomService = service
   return service
+}
+
+/** The app's DeckService, with the same Supabase-or-memory choice. */
+export function getDeckService(): DeckService {
+  if (globalForRooms.headbandsDeckService) {
+    return globalForRooms.headbandsDeckService
+  }
+
+  const db = supabaseAdmin()
+  let service: DeckService
+
+  if (db) {
+    service = new DeckService({
+      store: new SupabaseDeckStore(db),
+      images: new SupabaseImageStore(db),
+    })
+  } else if (process.env.NODE_ENV !== "production") {
+    service = new DeckService({
+      store: new MemoryDeckStore(),
+      images: getMemoryImages(),
+    })
+  } else {
+    throw notConfigured()
+  }
+
+  globalForRooms.headbandsDeckService = service
+  return service
+}
+
+/** Card images for local dev without Supabase; null when Supabase is on. */
+export function getMemoryImageStore(): MemoryImageStore | null {
+  return supabaseAdmin() ? null : getMemoryImages()
+}
+
+function getMemoryImages(): MemoryImageStore {
+  globalForRooms.headbandsMemoryImages ??= new MemoryImageStore()
+  return globalForRooms.headbandsMemoryImages
+}
+
+function supabaseAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const secret = process.env.SUPABASE_SECRET_KEY
+  if (!url || !secret) return null
+  return createClient(url, secret, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+}
+
+function notConfigured() {
+  return new Error(
+    "Supabase isn't configured: set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY.",
+  )
 }
 
 /** LiveKit Cloud credentials, or null to run without video. */

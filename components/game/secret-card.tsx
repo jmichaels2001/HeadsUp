@@ -16,6 +16,12 @@ const emojiSize = {
   lg: "text-5xl",
 } satisfies Record<CardSize, string>
 
+const imageSize = {
+  sm: "h-10",
+  md: "h-14",
+  lg: "h-28",
+} satisfies Record<CardSize, string>
+
 const labelSize = {
   sm: "text-sm",
   md: "text-label",
@@ -44,10 +50,19 @@ export function SecretCard({
         className,
       )}
     >
-      {card.emoji && (
-        <span aria-hidden className={cn("leading-none", emojiSize[size])}>
-          {card.emoji}
-        </span>
+      {card.imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element -- card images are resized on upload
+        <img
+          src={card.imageUrl}
+          alt=""
+          className={cn("w-auto max-w-full object-contain", imageSize[size])}
+        />
+      ) : (
+        card.emoji && (
+          <span aria-hidden className={cn("leading-none", emojiSize[size])}>
+            {card.emoji}
+          </span>
+        )
       )}
       <span
         className={cn(

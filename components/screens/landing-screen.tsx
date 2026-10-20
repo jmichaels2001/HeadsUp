@@ -1,10 +1,11 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState, type FormEvent } from "react"
 
 import { CardSlot, SecretCard } from "@/components/game/secret-card"
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { normalizeRoomCode } from "@/lib/room/protocol"
 
@@ -42,7 +43,14 @@ export function LandingScreen() {
 
   return (
     <>
-      <AppHeader />
+      <AppHeader>
+        <Link
+          href="/decks"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          My decks
+        </Link>
+      </AppHeader>
       <main className="mx-auto grid w-full max-w-6xl flex-1 items-center gap-10 px-4 pb-16 sm:px-6 lg:grid-cols-2">
         <section className="flex flex-col gap-6">
           <h1 className="text-display font-bold text-balance text-ink sm:text-[3.75rem]">
