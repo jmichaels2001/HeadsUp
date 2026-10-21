@@ -74,20 +74,23 @@ export function voiceLobby(count: number): GameState {
   })
 }
 
-/** `by` asks a question; in type mode everyone else answers it (default "yes"). */
+/**
+ * `by` asks a question. Type mode: everyone else answers it (default "yes").
+ * Voice mode: they ask out loud and tap End turn.
+ */
 export function ask(
   state: GameState,
   by: string,
   answers: Record<string, "yes" | "no"> = {},
 ): GameState {
+  if (state.settings.questionMode === "voice") {
+    return gameReducer(state, { type: "questionAnswered", by })
+  }
   let next = gameReducer(state, {
     type: "askQuestion",
     by,
     question: "Am I alive?",
   })
-  if (state.settings.questionMode === "voice") {
-    return gameReducer(next, { type: "questionAnswered", by })
-  }
   for (const id of next.round!.turnOrder) {
     if (id === by) continue
     next = gameReducer(next, {

@@ -68,6 +68,7 @@ export type QuestionOutcome = "yes" | "no" | "unsure"
 
 export interface PendingGuess {
   guesserId: PlayerId
+  /** Empty for voice-mode guesses, which are made out loud. */
   text: string
   votes: Record<PlayerId, Vote>
 }
@@ -90,6 +91,7 @@ export interface TurnState {
 export interface GuessResult {
   kind: "guess"
   guesserId: PlayerId
+  /** Empty for voice-mode guesses. */
   text: string
   correct: boolean
 }
@@ -120,7 +122,8 @@ export interface RoundState {
 
 /**
  * "type": the asker types a question and everyone else answers Yes / No.
- * "voice": the group answers out loud and the asker ends the question.
+ * "voice": players ask and guess out loud (on the video call). The player
+ * taps End turn after a question; a guess goes straight to the group vote.
  */
 export type QuestionMode = "type" | "voice"
 

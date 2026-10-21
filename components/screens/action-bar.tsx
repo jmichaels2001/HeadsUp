@@ -16,7 +16,7 @@ import { useState, type FormEvent, type ReactNode } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import type { QuestionMode, ViewerState } from "@/lib/game"
+import type { ViewerState } from "@/lib/game"
 import { useRoom } from "@/lib/room"
 
 import { nameOf, playerById } from "./game-screen"
@@ -95,7 +95,8 @@ function LastResult({ view }: { view: ViewerState }) {
         <>
           <X aria-hidden />
           <span>
-            Not yet for {who}: &ldquo;{result.text}&rdquo;
+            Not yet for {who}
+            {result.text && <>: &ldquo;{result.text}&rdquo;</>}
           </span>
         </>
       )}
@@ -158,7 +159,13 @@ function TurnPanel({ view }: { view: ViewerState }) {
       return (
         <Prompt
           icon={<Hourglass />}
-          title={<>Your guess: &ldquo;{guess.text}&rdquo;</>}
+          title={
+            guess.text ? (
+              <>Your guess: &ldquo;{guess.text}&rdquo;</>
+            ) : (
+              "You guessed out loud"
+            )
+          }
         >
           <VoteProgress voted={guess.votedCount} total={guess.eligibleCount} />
         </Prompt>
@@ -168,9 +175,13 @@ function TurnPanel({ view }: { view: ViewerState }) {
       <Prompt
         icon={<CircleHelp />}
         title={
-          <>
-            {activeName} guesses: &ldquo;{guess.text}&rdquo;
-          </>
+          guess.text ? (
+            <>
+              {activeName} guesses: &ldquo;{guess.text}&rdquo;
+            </>
+          ) : (
+            `${activeName} is guessing out loud`
+          )
         }
       >
         <p className="text-sm text-muted-foreground">
@@ -204,33 +215,6 @@ function TurnPanel({ view }: { view: ViewerState }) {
 
   if (turn.kind === "asking") {
     const q = turn.question
-
-    if (q.mode === "voice") {
-      if (yourTurn) {
-        return (
-          <Prompt
-            icon={<MessageCircleQuestion />}
-            title="Ask your question out loud"
-          >
-            <p className="text-sm text-muted-foreground">
-              Listen to the group&apos;s answer, then tap below.
-            </p>
-            <Button size="lg" onClick={actions.questionAnswered}>
-              {view.settings.passAfterQuestion ? "End turn" : "Got my answer"}
-            </Button>
-          </Prompt>
-        )
-      }
-      return (
-        <Prompt
-          icon={<MessageCircleQuestion />}
-          title={`${activeName} is asking a question`}
-        >
-          <p className="text-sm text-muted-foreground">Answer out loud!</p>
-          {solvedNote}
-        </Prompt>
-      )
-    }
 
     if (!q.canAnswer) {
       return (
@@ -292,19 +276,61 @@ function TurnPanel({ view }: { view: ViewerState }) {
     )
   }
 
-  if (yourTurn) return <YourTurnActions mode={view.settings.questionMode} />
+  if (yourTurn) {
+    return view.settings.questionMode === "voice" ? (
+      <VoiceTurnActions passAfterQuestion={view.settings.passAfterQuestion} />
+    ) : (
+      <YourTurnActions />
+    )
+  }
 
   return (
     <Prompt icon={<Hourglass />} title={`${activeName}'s turn`}>
       <p className="text-sm text-muted-foreground">
-        Waiting for {activeName} to ask a question or make a guess.
+        {view.settings.questionMode === "voice"
+          ? `${activeName} asks out loud: answer out loud!`
+          : `Waiting for ${activeName} to ask a question or make a guess.`}
       </p>
       {solvedNote}
     </Prompt>
   )
 }
 
-function YourTurnActions({ mode: questionMode }: { mode: QuestionMode }) {
+/** Voice mode: ask out loud, then end your turn or call for a vote. */
+function VoiceTurnActions({
+  passAfterQuestion,
+}: {
+  passAfterQuestion: boolean
+}) {
+  const { actions } = useRoom()
+  return (
+    <Prompt icon={<Sparkles />} title="Your turn!">
+      <p className="text-sm text-muted-foreground">
+        {passAfterQuestion
+          ? "Ask the group a yes/no question out loud, then end your turn. Or say your guess out loud and tap Guess."
+          : "Keep asking out loud, then guess when ready: say it out loud and tap Guess."}
+      </p>
+      <div className={cn("grid gap-3", passAfterQuestion && "grid-cols-2")}>
+        <Button
+          size="lg"
+          variant="secondary"
+          onClick={() => actions.makeGuess("")}
+        >
+          <CircleHelp aria-hidden />
+          Guess
+        </Button>
+        {passAfterQuestion && (
+          <Button size="lg" onClick={actions.questionAnswered}>
+            <Check aria-hidden />
+            End turn
+          </Button>
+        )}
+      </div>
+    </Prompt>
+  )
+}
+
+function YourTurnActions() {
   const { actions } = useRoom()
   const [mode, setMode] = useState<"choose" | "ask" | "guess">("choose")
   const [text, setText] = useState("")
@@ -322,15 +348,7 @@ function YourTurnActions({ mode: questionMode }: { mode: QuestionMode }) {
           Ask the group a yes/no question about your card, or take a guess.
         </p>
         <div className="grid grid-cols-2 gap-3">
-          <Button
-            size="lg"
-            onClick={() =>
-              // Voice mode: no typing, just ask out loud.
-              questionMode === "voice"
-                ? actions.askQuestion("")
-                : setMode("ask")
-            }
-          >
+          <Button size="lg" onClick={() => setMode("ask")}>
             <MessageCircleQuestion aria-hidden />
             Ask
           </Button>

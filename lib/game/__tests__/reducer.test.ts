@@ -179,7 +179,7 @@ describe("guess confirmation", () => {
     expect(state.round!.solved).toEqual(["a"])
   })
 
-  it("ignores empty guesses", () => {
+  it("ignores empty guesses in type mode", () => {
     const state = started(3)
     expect(gameReducer(state, { type: "makeGuess", by: "a", text: "  " })).toBe(
       state,
@@ -384,40 +384,95 @@ describe("typed questions", () => {
       state,
     )
   })
+
+  it("ignores the voice-mode End turn action while choosing", () => {
+    const state = started(3)
+    expect(gameReducer(state, { type: "questionAnswered", by: "a" })).toBe(
+      state,
+    )
+  })
 })
 
-describe("voice questions", () => {
-  function voiceStarted(count: number) {
-    return gameReducer(voiceLobby(count), {
-      type: "startRound",
-      by: "a",
-      seed: 42,
-    })
+describe("voice mode", () => {
+  function voiceStarted(count: number, passAfterQuestion = true) {
+    return apply(
+      voiceLobby(count),
+      {
+        type: "updateSettings",
+        by: "a",
+        settings: { passAfterQuestion },
+      },
+      { type: "startRound", by: "a", seed: 42 },
+    )
   }
 
-  it("allows asking without text", () => {
-    const state = gameReducer(voiceStarted(3), {
-      type: "askQuestion",
-      by: "a",
-      question: "",
-    })
-    expect(state.round!.turn!.stage.kind).toBe("asking")
-  })
-
-  it("passes the turn when the asker ends it, with no group vote", () => {
+  it("passes the turn on End turn, with no group vote", () => {
     const state = ask(voiceStarted(3), "a")
     expect(active(state)).toBe("b")
+    expect(state.round!.turn!.stage.kind).toBe("choosing")
     expect(state.round!.lastResult).toBeNull()
   })
 
-  it("ignores Yes / No answers", () => {
-    const state = gameReducer(voiceStarted(3), {
-      type: "askQuestion",
-      by: "a",
-      question: "",
-    })
+  it("keeps the turn on End turn when the house rule says so", () => {
+    const state = ask(voiceStarted(3, false), "a")
+    expect(active(state)).toBe("a")
+    expect(state.round!.turn!.stage.kind).toBe("choosing")
+  })
+
+  it("only lets the active player end their turn", () => {
+    const state = voiceStarted(3)
+    expect(gameReducer(state, { type: "questionAnswered", by: "b" })).toBe(
+      state,
+    )
+  })
+
+  it("ignores typed questions", () => {
+    const state = voiceStarted(3)
     expect(
-      gameReducer(state, { type: "answerQuestion", by: "b", answer: "yes" }),
+      gameReducer(state, { type: "askQuestion", by: "a", question: "Alive?" }),
     ).toBe(state)
+  })
+
+  it("sends a guess with no text straight to the group vote", () => {
+    const state = gameReducer(voiceStarted(3), {
+      type: "makeGuess",
+      by: "a",
+      text: "",
+    })
+    expect(state.round!.turn!.stage).toEqual({
+      kind: "voting",
+      guess: { guesserId: "a", text: "", votes: {} },
+    })
+  })
+
+  it("resolves an out-loud guess by vote", () => {
+    let state = gameReducer(voiceStarted(3), {
+      type: "makeGuess",
+      by: "a",
+      text: "",
+    })
+    state = apply(
+      state,
+      { type: "castVote", by: "b", vote: "correct" },
+      { type: "castVote", by: "c", vote: "correct" },
+    )
+    expect(state.round!.solved).toEqual(["a"])
+    expect(state.round!.lastResult).toMatchObject({
+      kind: "guess",
+      text: "",
+      correct: true,
+    })
+    expect(active(state)).toBe("b")
+  })
+
+  it("can't end the turn while a guess is being voted on", () => {
+    const state = gameReducer(voiceStarted(3), {
+      type: "makeGuess",
+      by: "a",
+      text: "",
+    })
+    expect(gameReducer(state, { type: "questionAnswered", by: "a" })).toBe(
+      state,
+    )
   })
 })

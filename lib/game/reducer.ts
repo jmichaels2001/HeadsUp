@@ -33,8 +33,9 @@ export type GameAction =
   | { type: "askQuestion"; by: PlayerId; question: string }
   /** Type mode: a player answers the pending question. */
   | { type: "answerQuestion"; by: PlayerId; answer: Answer }
-  /** Voice mode: the asker heard the answer and ends the question. */
+  /** Voice mode: the player asked out loud and ends their turn. */
   | { type: "questionAnswered"; by: PlayerId }
+  /** Text is required in type mode; voice-mode guesses are made out loud. */
   | { type: "makeGuess"; by: PlayerId; text: string }
   | { type: "castVote"; by: PlayerId; vote: Vote }
   | { type: "endRound"; by: PlayerId }
@@ -90,10 +91,12 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       if (!isHost(state, action.by) || state.phase !== "roundEnd") return state
       return dealRound(state, action.seed)
     case "askQuestion": {
+      // Type mode only: in voice mode questions are asked out loud and the
+      // player ends their turn with questionAnswered.
+      if (state.settings.questionMode !== "type") return state
       const question = action.question.trim()
-      // In type mode the group votes on the text, so it's required.
-      if (state.settings.questionMode === "type" && !question) return state
-      return withTurn(state, action.by, "choosing", (round) => ({
+      if (!question) return state
+      return withTurn(state, action.by, (round) => ({
         ...round,
         turn: {
           activePlayerId: action.by,
@@ -106,13 +109,13 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
       return answerQuestion(state, action.by, action.answer)
     case "questionAnswered":
       if (state.settings.questionMode !== "voice") return state
-      return withTurn(state, action.by, "asking", (round) =>
+      return withTurn(state, action.by, (round) =>
         afterQuestion(state, round, action.by),
       )
     case "makeGuess": {
       const text = action.text.trim()
-      if (!text) return state
-      return withTurn(state, action.by, "choosing", (round) => ({
+      if (state.settings.questionMode === "type" && !text) return state
+      return withTurn(state, action.by, (round) => ({
         ...round,
         turn: {
           activePlayerId: action.by,
@@ -243,17 +246,16 @@ function dealRound(state: GameState, seed: number): GameState {
   }
 }
 
-/** Apply `update` only if it's `playerId`'s turn and the stage matches. */
+/** Apply `update` only if it's `playerId`'s turn and they're choosing. */
 function withTurn(
   state: GameState,
   playerId: PlayerId,
-  stage: "choosing" | "asking",
   update: (round: RoundState) => RoundState,
 ): GameState {
   const round = state.round
   if (state.phase !== "playing" || !round?.turn) return state
   if (round.turn.activePlayerId !== playerId) return state
-  if (round.turn.stage.kind !== stage) return state
+  if (round.turn.stage.kind !== "choosing") return state
   const nextRound = update(round)
   if (!nextRound.turn) return finishRound({ ...state, round: nextRound }, false)
   return { ...state, round: nextRound }

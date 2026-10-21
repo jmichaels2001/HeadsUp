@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest"
 import { gameReducer } from "../reducer"
 import type { GameState } from "../types"
 import { getViewerState } from "../viewer"
-import { ask, guessAndVote, makePlayer, started } from "./helpers"
+import { ask, guessAndVote, makePlayer, started, voiceLobby } from "./helpers"
 
 /** Asserts the viewer's own card id and label appear nowhere in the projection. */
 function expectOwnCardHidden(state: GameState, viewerId: string) {
@@ -162,5 +162,21 @@ describe("getViewerState questions", () => {
     const json = JSON.stringify(getViewerState(state, "a"))
     expect(json).not.toContain(card.label)
     expect(json).not.toContain(card.id)
+  })
+})
+
+describe("getViewerState voice mode", () => {
+  it("shows voters an out-loud guess with no text", () => {
+    let state = gameReducer(voiceLobby(3), {
+      type: "startRound",
+      by: "a",
+      seed: 42,
+    })
+    state = gameReducer(state, { type: "makeGuess", by: "a", text: "" })
+    expect(getViewerState(state, "b").round!.turn).toMatchObject({
+      kind: "voting",
+      guess: { guesserId: "a", text: "", canVote: true },
+    })
+    expectOwnCardHidden(state, "a")
   })
 })
