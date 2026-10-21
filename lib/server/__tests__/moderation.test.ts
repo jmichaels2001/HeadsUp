@@ -9,6 +9,7 @@ import {
 import { DeckService } from "../deck-service"
 import { MemoryDeckStore } from "../deck-store"
 import { MemoryImageStore } from "../image-store"
+import { MemoryGenerationLog } from "../generation-log"
 import { MemoryReportStore } from "../report-store"
 import { RoomError, RoomService } from "../room-service"
 import { MemoryRoomStore } from "../store"
@@ -29,6 +30,7 @@ beforeEach(() => {
   decks = new DeckService({
     store,
     reports,
+    generations: new MemoryGenerationLog(),
     images: new MemoryImageStore(),
     now: () => (clock += 10),
     id: (prefix) => `${prefix}_${++n}`,

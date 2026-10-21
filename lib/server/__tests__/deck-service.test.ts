@@ -11,6 +11,7 @@ import {
 
 import { DeckService } from "../deck-service"
 import { MemoryDeckStore } from "../deck-store"
+import { MemoryGenerationLog } from "../generation-log"
 import { MemoryReportStore } from "../report-store"
 import { MemoryImageStore, sniffImageType } from "../image-store"
 import { RoomError } from "../room-service"
@@ -43,6 +44,7 @@ beforeEach(() => {
     store: new MemoryDeckStore(),
     images,
     reports: new MemoryReportStore(),
+    generations: new MemoryGenerationLog(),
     now: () => clock++,
     id: (prefix) => `${prefix}_${++n}`,
   })

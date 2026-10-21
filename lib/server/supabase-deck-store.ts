@@ -4,10 +4,11 @@ import type { CardRecord, DeckRecord } from "@/lib/custom-decks/deck-view"
 import type { DeckMeta } from "@/lib/custom-decks/protocol"
 
 import type { CardPatch, DeckStore, LibraryQuery } from "./deck-store"
+import type { GenerationLog } from "./generation-log"
 import type { ReportRecord, ReportStatus, ReportStore } from "./report-store"
 
 const DECK_COLUMNS =
-  "id, name, emoji, description, created_by, version, play_count, hidden, created_at, updated_at"
+  "id, name, emoji, description, created_by, version, play_count, hidden, generated_from, created_at, updated_at"
 const CARD_COLUMNS = "id, deck_id, label, image_url, created_by, created_at"
 
 interface DeckRow {
@@ -19,6 +20,7 @@ interface DeckRow {
   version: number
   play_count: number
   hidden: boolean
+  generated_from: string | null
   created_at: string
   updated_at: string
 }
@@ -28,7 +30,7 @@ interface CardRow {
   deck_id: string
   label: string
   image_url: string | null
-  created_by: string
+  created_by: string | null
   created_at: string
 }
 
@@ -46,6 +48,7 @@ function toDeck(row: DeckRow): DeckRecord {
     version: row.version,
     playCount: row.play_count,
     hidden: row.hidden,
+    generatedFrom: row.generated_from,
     createdAt: Date.parse(row.created_at),
     updatedAt: Date.parse(row.updated_at),
   }
@@ -78,6 +81,7 @@ export class SupabaseDeckStore implements DeckStore {
       version: deck.version,
       play_count: deck.playCount,
       hidden: deck.hidden,
+      generated_from: deck.generatedFrom,
       created_at: iso(deck.createdAt),
       updated_at: iso(deck.updatedAt),
     })
@@ -199,7 +203,7 @@ export class SupabaseDeckStore implements DeckStore {
   }
 
   async getCardCreators(deckIds: string[]) {
-    const result: Record<string, string[]> = Object.fromEntries(
+    const result: Record<string, (string | null)[]> = Object.fromEntries(
       deckIds.map((id) => [id, []]),
     )
     if (!deckIds.length) return result
@@ -213,15 +217,21 @@ export class SupabaseDeckStore implements DeckStore {
   }
 
   async addCard(card: CardRecord) {
-    const { error } = await this.db.from("deck_cards").insert({
-      id: card.id,
-      deck_id: card.deckId,
-      label: card.label,
-      image_url: card.imageUrl,
-      created_by: card.createdBy,
-      created_at: iso(card.createdAt),
-    })
-    if (error) fail("addCard", error)
+    await this.addCards([card])
+  }
+
+  async addCards(cards: CardRecord[]) {
+    const { error } = await this.db.from("deck_cards").insert(
+      cards.map((card) => ({
+        id: card.id,
+        deck_id: card.deckId,
+        label: card.label,
+        image_url: card.imageUrl,
+        created_by: card.createdBy,
+        created_at: iso(card.createdAt),
+      })),
+    )
+    if (error) fail("addCards", error)
   }
 
   async updateCard(deckId: string, cardId: string, patch: CardPatch) {
@@ -311,5 +321,27 @@ export class SupabaseReportStore implements ReportStore {
       .eq("deck_id", deckId)
       .eq("status", "open")
     if (error) fail("closeReports", error)
+  }
+}
+
+/** GenerationLog backed by the `ai_generations` table (migration 0004). */
+export class SupabaseGenerationLog implements GenerationLog {
+  constructor(private db: SupabaseClient) {}
+
+  async countSince(deviceId: string, since: number) {
+    const { count, error } = await this.db
+      .from("ai_generations")
+      .select("id", { count: "exact", head: true })
+      .eq("device_id", deviceId)
+      .gte("created_at", iso(since))
+    if (error) fail("countSince", error)
+    return count ?? 0
+  }
+
+  async record(deviceId: string, at: number) {
+    const { error } = await this.db
+      .from("ai_generations")
+      .insert({ device_id: deviceId, created_at: iso(at) })
+    if (error) fail("record", error)
   }
 }

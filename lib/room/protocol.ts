@@ -82,6 +82,7 @@ export type RoomErrorCode =
   | "invalid"
   | "rejected"
   | "conflict"
+  | "rateLimited"
   | "unavailable"
 
 export interface ApiError {

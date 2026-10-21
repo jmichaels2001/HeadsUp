@@ -6,6 +6,7 @@ import {
   type CardRecord,
 } from "@/lib/custom-decks/deck-view"
 import {
+  AI_HOURLY_LIMIT,
   AUTO_HIDE_REPORTS,
   deviceIdSchema,
   isPlayable,
@@ -17,6 +18,7 @@ import {
   type DeckListItem,
   type DeckMeta,
   type DeckView,
+  type GenerateDeckRequest,
   type ImageUploadResponse,
   type LibraryItem,
   type LibrarySort,
@@ -26,7 +28,9 @@ import {
 } from "@/lib/custom-decks/protocol"
 import type { Category } from "@/lib/game"
 
+import type { DeckGenerator } from "./ai-deck"
 import type { DeckStore } from "./deck-store"
+import type { GenerationLog } from "./generation-log"
 import { imageFileName, sniffImageType, type ImageStore } from "./image-store"
 import type { ReportStore } from "./report-store"
 import { RoomError } from "./room-service"
@@ -35,6 +39,9 @@ export interface DeckServiceDeps {
   store: DeckStore
   images: ImageStore
   reports: ReportStore
+  generations: GenerationLog
+  /** Omit when AI generation isn't configured. */
+  generator?: DeckGenerator | null
   now?: () => number
   id?: (prefix: string) => string
 }
@@ -52,6 +59,8 @@ export class DeckService {
   private store: DeckStore
   private images: ImageStore
   private reports: ReportStore
+  private generations: GenerationLog
+  private generator: DeckGenerator | null
   private now: () => number
   private id: (prefix: string) => string
 
@@ -59,6 +68,8 @@ export class DeckService {
     this.store = deps.store
     this.images = deps.images
     this.reports = deps.reports
+    this.generations = deps.generations
+    this.generator = deps.generator ?? null
     this.now = deps.now ?? Date.now
     this.id = deps.id ?? defaultId
   }
@@ -73,6 +84,7 @@ export class DeckService {
       version: 0,
       playCount: 0,
       hidden: false,
+      generatedFrom: null,
       createdAt: now,
       updatedAt: now,
     }
@@ -85,6 +97,61 @@ export class DeckService {
     const deck = await this.store.getDeck(id)
     if (!deck) throw notFound()
     return getDeckView(deck, await this.store.getCards(id), device)
+  }
+
+  get aiEnabled(): boolean {
+    return this.generator !== null
+  }
+
+  /**
+   * Generate a blind deck from a prompt and save it. The generator never
+   * sees the cards (the view counts them as AI cards), and AI cards have no
+   * creator, so anyone can be dealt them, the generator included.
+   */
+  async generate(
+    deviceId: string,
+    { prompt, count = 20 }: GenerateDeckRequest,
+  ): Promise<DeckView> {
+    const device = checkDevice(deviceId)
+    if (!this.generator) {
+      throw new RoomError("unavailable", "AI generation isn't configured.")
+    }
+    const now = this.now()
+    const used = await this.generations.countSince(device, now - 3_600_000)
+    if (used >= AI_HOURLY_LIMIT) {
+      throw new RoomError(
+        "rateLimited",
+        `You've generated ${AI_HOURLY_LIMIT} decks this hour. Try again later.`,
+      )
+    }
+    // Count attempts, not successes, so failures can't be retried endlessly.
+    await this.generations.record(device, now)
+
+    const generated = await this.generator(prompt.trim(), count)
+    const deck = {
+      id: this.id("d"),
+      name: generated.name,
+      emoji: generated.emoji,
+      description: generated.description,
+      createdBy: device,
+      version: 0,
+      playCount: 0,
+      hidden: false,
+      generatedFrom: prompt.trim(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    await this.store.createDeck(deck)
+    const cards: CardRecord[] = generated.labels.map((label, i) => ({
+      id: this.id("c"),
+      deckId: deck.id,
+      label,
+      imageUrl: null,
+      createdBy: null,
+      createdAt: now + i,
+    }))
+    await this.store.addCards(cards)
+    return getDeckView(deck, cards, device)
   }
 
   /**
@@ -119,6 +186,7 @@ export class DeckService {
         myCardCount: cards.filter((c) => c === device).length,
         playable: isPlayable(cards.length),
         hidden: d.hidden,
+        ai: d.generatedFrom !== null,
         updatedAt: d.updatedAt,
       }
     })
@@ -145,6 +213,7 @@ export class DeckService {
         description: d.description,
         cardCount: creators[d.id].length,
         playCount: d.playCount,
+        ai: d.generatedFrom !== null,
         createdAt: d.createdAt,
       }))
   }

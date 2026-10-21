@@ -53,6 +53,7 @@ export function LibraryScreen() {
                     </span>
                   )}
                   <span className="mt-1 block text-xs font-bold text-muted-foreground">
+                    {item.ai && "✨ AI · "}
                     {libraryDetail(item)}
                   </span>
                 </span>

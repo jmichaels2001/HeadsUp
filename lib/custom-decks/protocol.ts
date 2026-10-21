@@ -62,6 +62,18 @@ export const reportSchema = z.strictObject({
 })
 export type ReportRequest = z.input<typeof reportSchema>
 
+export const MAX_AI_PROMPT = 200
+export const MIN_AI_CARDS = MIN_PLAYABLE_CARDS
+export const MAX_AI_CARDS = 40
+/** Generations allowed per browser per hour. */
+export const AI_HOURLY_LIMIT = 10
+
+export const generateDeckSchema = z.strictObject({
+  prompt: z.string().trim().min(1).max(MAX_AI_PROMPT),
+  count: z.number().int().min(MIN_AI_CARDS).max(MAX_AI_CARDS).default(20),
+})
+export type GenerateDeckRequest = z.input<typeof generateDeckSchema>
+
 export const librarySortSchema = z.enum(["newest", "popular"])
 export type LibrarySort = z.infer<typeof librarySortSchema>
 
@@ -73,13 +85,18 @@ export interface DeckView {
   description: string
   version: number
   myCards: Card[]
+  /** Cards other players added (you can't see them). */
   otherCardCount: number
+  /** AI-generated cards (nobody can see them). */
+  aiCardCount: number
   totalCardCount: number
   playable: boolean
   /** Only when every remaining card is yours (or there are none). */
   canDelete: boolean
   /** Hidden from the library while reports are reviewed. */
   hidden: boolean
+  /** Generated with AI. */
+  ai: boolean
 }
 
 export interface DeckListItem {
@@ -91,6 +108,7 @@ export interface DeckListItem {
   myCardCount: number
   playable: boolean
   hidden: boolean
+  ai: boolean
   updatedAt: number
 }
 
@@ -102,6 +120,7 @@ export interface LibraryItem {
   description: string
   cardCount: number
   playCount: number
+  ai: boolean
   createdAt: number
 }
 
@@ -120,7 +139,14 @@ export interface AdminDeck {
   description: string
   hidden: boolean
   playCount: number
-  cards: { id: string; label: string; imageUrl: string | null }[]
+  /** The prompt, for AI decks. */
+  generatedFrom: string | null
+  cards: {
+    id: string
+    label: string
+    imageUrl: string | null
+    ai: boolean
+  }[]
   reports: AdminReport[]
 }
 

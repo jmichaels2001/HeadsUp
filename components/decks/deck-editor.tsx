@@ -302,6 +302,12 @@ function CardsSection({
             ? "No cards from other players yet."
             : `${view.otherCardCount} more ${view.otherCardCount === 1 ? "card" : "cards"} by other players`}
         </p>
+        {view.aiCardCount > 0 && (
+          <p className="font-semibold">
+            ✨ {view.aiCardCount} {view.aiCardCount === 1 ? "card" : "cards"}{" "}
+            made by AI (hidden from everyone)
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           You can&apos;t see other players&apos; cards, so you can still play
           with them. {view.totalCardCount} of up to {MAX_DECK_CARDS} cards in

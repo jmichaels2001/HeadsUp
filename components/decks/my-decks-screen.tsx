@@ -39,6 +39,12 @@ export function MyDecksScreen() {
         >
           Library
         </Link>
+        <Link
+          href="/decks/generate"
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
+          ✨ Generate
+        </Link>
         <Link href="/decks/new" className={buttonVariants({ size: "sm" })}>
           <Plus />
           New deck
@@ -93,6 +99,11 @@ export function MyDecksScreen() {
                       {deck.totalCardCount} cards · {deck.myCardCount} yours
                     </span>
                   </span>
+                  {deck.ai && (
+                    <span className="rounded-full border-2 border-ink bg-secondary px-2 py-0.5 text-xs font-bold uppercase">
+                      ✨ AI
+                    </span>
+                  )}
                   {deck.hidden && (
                     <span className="rounded-full border-2 border-ink bg-destructive-soft px-2 py-0.5 text-xs font-bold uppercase">
                       Under review

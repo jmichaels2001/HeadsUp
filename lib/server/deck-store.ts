@@ -35,8 +35,9 @@ export interface DeckStore {
   incrementPlayCount(id: string): Promise<void>
   getCards(deckId: string): Promise<CardRecord[]>
   /** Card counts per deck, by creator. */
-  getCardCreators(deckIds: string[]): Promise<Record<string, string[]>>
+  getCardCreators(deckIds: string[]): Promise<Record<string, (string | null)[]>>
   addCard(card: CardRecord): Promise<void>
+  addCards(cards: CardRecord[]): Promise<void>
   updateCard(deckId: string, cardId: string, patch: CardPatch): Promise<void>
   deleteCard(deckId: string, cardId: string): Promise<void>
 }
@@ -134,7 +135,7 @@ export class MemoryDeckStore implements DeckStore {
   }
 
   async getCardCreators(deckIds: string[]) {
-    const result: Record<string, string[]> = Object.fromEntries(
+    const result: Record<string, (string | null)[]> = Object.fromEntries(
       deckIds.map((id) => [id, []]),
     )
     for (const card of this.cards.values()) {
@@ -145,6 +146,10 @@ export class MemoryDeckStore implements DeckStore {
 
   async addCard(card: CardRecord) {
     this.cards.set(card.id, structuredClone(card))
+  }
+
+  async addCards(cards: CardRecord[]) {
+    for (const card of cards) await this.addCard(card)
   }
 
   async updateCard(deckId: string, cardId: string, patch: CardPatch) {

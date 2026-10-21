@@ -8,6 +8,7 @@ import {
   type DeckListItem,
   type DeckMeta,
   type DeckView,
+  type GenerateDeckRequest,
   type ImageUploadResponse,
   type LibraryItem,
   type LibrarySort,
@@ -58,6 +59,9 @@ export const deckApi = {
     request<LibraryItem[]>(
       `/api/decks/library?${new URLSearchParams({ q: query, sort })}`,
     ),
+  aiStatus: () => request<{ enabled: boolean }>("/api/decks/generate"),
+  generate: (body: GenerateDeckRequest) =>
+    request<DeckView>("/api/decks/generate", { method: "POST", body }),
   report: (id: string, body: ReportRequest) =>
     request<{ ok: true }>(`${deckPath(id)}/report`, { method: "POST", body }),
   create: (meta: DeckMeta) =>

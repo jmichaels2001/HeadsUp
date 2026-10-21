@@ -5,6 +5,7 @@ import { Check, ExternalLink, RefreshCw } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 
+import { GenerateDeckForm } from "@/components/decks/generate-deck-form"
 import {
   LibraryBrowser,
   libraryDetail,
@@ -14,6 +15,7 @@ import { deckApi } from "@/lib/custom-decks/client"
 import {
   MIN_PLAYABLE_CARDS,
   type DeckListItem,
+  type DeckView,
 } from "@/lib/custom-decks/protocol"
 import { getDeckSummaries } from "@/lib/decks"
 import type { ViewerState } from "@/lib/game"
@@ -22,7 +24,7 @@ import { useRoom } from "@/lib/room"
 const BUILT_IN = getDeckSummaries()
 const isBuiltIn = (id: string | undefined) => BUILT_IN.some((d) => d.id === id)
 
-type Tab = "builtIn" | "library" | "mine"
+type Tab = "builtIn" | "library" | "mine" | "ai"
 
 /** The lobby's category picker: built-in decks and the host's own decks. */
 export function DeckPicker({ view }: { view: ViewerState }) {
@@ -46,13 +48,14 @@ export function DeckPicker({ view }: { view: ViewerState }) {
         <div
           role="tablist"
           aria-label="Deck source"
-          className="mb-4 grid grid-cols-3 gap-1 rounded-xl border-2 border-ink bg-muted p-1"
+          className="mb-4 grid grid-cols-4 gap-1 rounded-xl border-2 border-ink bg-muted p-1"
         >
           {(
             [
               ["builtIn", "Built-in"],
               ["library", "Library"],
-              ["mine", "My decks"],
+              ["mine", "Mine"],
+              ["ai", "✨ AI"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -62,7 +65,7 @@ export function DeckPicker({ view }: { view: ViewerState }) {
               aria-selected={tab === id}
               onClick={() => setTab(id)}
               className={cn(
-                "rounded-lg px-3 py-1.5 font-heading font-semibold outline-none focus-visible:ring-4 focus-visible:ring-ring/40",
+                "rounded-lg px-1 py-1.5 font-heading font-semibold outline-none focus-visible:ring-4 focus-visible:ring-ring/40",
                 tab === id ? "bg-card shadow-pop-sm" : "hover:bg-card/60",
               )}
             >
@@ -102,6 +105,11 @@ export function DeckPicker({ view }: { view: ViewerState }) {
         <p className="rounded-xl bg-muted p-3 text-sm font-semibold">
           Custom decks need server mode.
         </p>
+      ) : tab === "ai" ? (
+        <GenerateTab
+          view={view}
+          onSelect={(id) => actions.selectCategory(id)}
+        />
       ) : tab === "library" ? (
         <LibraryBrowser
           label="Category"
@@ -110,7 +118,7 @@ export function DeckPicker({ view }: { view: ViewerState }) {
               emoji={item.emoji}
               name={item.name}
               description={item.description}
-              detail={libraryDetail(item)}
+              detail={`${item.ai ? "✨ AI · " : ""}${libraryDetail(item)}`}
               warn={item.cardCount < view.players.length}
               selected={selectedId === item.id}
               onSelect={() => actions.selectCategory(item.id)}
@@ -192,11 +200,12 @@ function MyDecks({
               name={deck.name}
               description={deck.description}
               detail={
-                deck.hidden
+                (deck.ai ? "✨ AI · " : "") +
+                (deck.hidden
                   ? "Under review"
                   : deck.playable
                     ? `${deck.totalCardCount} cards · ${deck.myCardCount} yours`
-                    : `Draft: ${deck.totalCardCount}/${MIN_PLAYABLE_CARDS} cards`
+                    : `Draft: ${deck.totalCardCount}/${MIN_PLAYABLE_CARDS} cards`)
               }
               warn={!deck.playable || deck.hidden}
               selected={view.category?.id === deck.id}
@@ -213,6 +222,38 @@ function MyDecks({
           Refresh
         </Button>
       </div>
+    </div>
+  )
+}
+
+/** Generate a blind deck, then pick it like any other (never automatic). */
+function GenerateTab({
+  view,
+  onSelect,
+}: {
+  view: ViewerState
+  onSelect: (id: string) => void
+}) {
+  const [made, setMade] = useState<DeckView[]>([])
+  return (
+    <div className="flex flex-col gap-4">
+      <GenerateDeckForm onGenerated={(deck) => setMade((m) => [deck, ...m])} />
+      {made.length > 0 && (
+        <DeckGrid>
+          {made.map((deck) => (
+            <DeckTile
+              key={deck.id}
+              emoji={deck.emoji}
+              name={deck.name}
+              description={deck.description}
+              detail={`✨ AI · ${deck.totalCardCount} cards · tap to use`}
+              warn={deck.totalCardCount < view.players.length}
+              selected={view.category?.id === deck.id}
+              onSelect={() => onSelect(deck.id)}
+            />
+          ))}
+        </DeckGrid>
+      )}
     </div>
   )
 }

@@ -44,9 +44,9 @@ There are still no accounts, and for this phase there is no deck access control:
 ### AI-generated decks
 
 - **Provider.** Anthropic Claude API via the official SDK, server-side only; key in `ANTHROPIC_API_KEY`. Model `claude-haiku-5-5` by default, overridable with `ANTHROPIC_MODEL`. Check current SDK docs before use.
-- **Flow.** User enters a prompt (≤ 200 chars) and a card count (10–40, default 20). The server asks the model for structured output (deck name, emoji, description, card labels), validates it with zod, de-duplicates labels, and returns it. Generated cards have no images; people can paste them in while reviewing. Saved generated cards belong to the device that saved them.
-- **Review before use (answers the overview's open question).** A generated deck always opens in the editor unsaved. A human reviews and tweaks it, then saves it (which adds it to the library) and can select it. Generated decks are never auto-saved or auto-selected.
-- **Guardrails.** The system prompt asks for well-known, guessable, friend-appropriate answers suitable for a Headbands game. Per-device rate limit of 10 generations per hour, stored in the database (not memory) so it works on Vercel. No other abuse protection.
+- **Flow.** User enters a prompt (≤ 200 chars) and a card count (10–40, default 20). The server asks the model for structured output (deck name, emoji, description, card labels), validates it with zod, cleans and de-duplicates labels, and saves the deck straight away. Generated cards have no images.
+- **Blind decks (replaces "review before use").** Nobody sees an AI deck's cards: the generator sees only its name, emoji, and card count. AI cards have no creator, so anyone, including the generator, can be dealt them (a reviewed deck would make the generator unable to play it, given the never-your-own-card rule). Friends can still add their own cards later. Bad output is caught by the report → `/admin` flow; `/admin` shows the prompt a deck came from. The generator can delete their own AI deck. Generated decks are never auto-selected: the host picks them like any other deck.
+- **Guardrails.** The system prompt asks for well-known, guessable, friend-appropriate answers suitable for a Headbands game, and no private individuals. Per-device rate limit of 10 generations per hour, stored in the database (not memory) so it works on Vercel. No other abuse protection.
 - **Fallback.** Without `ANTHROPIC_API_KEY` the Generate tab shows "AI generation isn't configured" and everything else still works.
 
 ### Mock mode
@@ -66,7 +66,7 @@ Accounts, deck access control or private decks, per-person collaborator roles, l
 - A player creates a deck, pastes an image onto a card and picks another from a file. A second browser adds its own cards and sees only those plus a count of the first player's cards (checked in the API response, not just the UI). A stale save of the deck name is rejected cleanly.
 - A host picks a custom deck in the lobby and plays a full round with it across two browsers; editing the deck mid-round doesn't affect the round, and nobody is dealt a card they created.
 - A deck can be found in the library, reported, auto-hidden at the report threshold, and dismissed/hidden/deleted from `/admin`.
-- A prompt generates a valid deck that opens in the editor unsaved; malformed model output is rejected with a friendly error; the rate limit kicks in.
+- A prompt generates a valid blind deck that anyone (including the generator) can be dealt from; malformed model output is rejected with a friendly error; the rate limit kicks in.
 - Without Supabase, LiveKit, or Anthropic env vars the app still runs, with the affected features showing a clear "not configured" state.
 - Unit tests cover deck validation, image upload checks (type and size), the deck API only returning the requester's cards, card edit/remove limited to the creator, delete-deck rules, duplicate-label merging, dealing that never gives a player their own card (including the blocked case), version conflicts, report threshold logic, AI output parsing/validation, and the rate limiter; existing tests still pass; typecheck and lint are clean.
 - New env vars (`ADMIN_SECRET`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`) are in `.env.example`, the migration and setup steps are documented, and everything is committed.

@@ -4,6 +4,7 @@ import { mergeDuplicateCards } from "@/lib/custom-decks/deck-view"
 
 import { DeckService } from "../deck-service"
 import { MemoryDeckStore } from "../deck-store"
+import { MemoryGenerationLog } from "../generation-log"
 import { MemoryReportStore } from "../report-store"
 import { MemoryImageStore } from "../image-store"
 import { RoomError, RoomService } from "../room-service"
@@ -21,6 +22,7 @@ function setup() {
     store: new MemoryDeckStore(),
     images: new MemoryImageStore(),
     reports: new MemoryReportStore(),
+    generations: new MemoryGenerationLog(),
   })
   const rooms = new RoomService({
     store: new MemoryRoomStore(),

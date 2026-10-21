@@ -177,6 +177,12 @@ function AdminDeckCard({ deck }: { deck: AdminDeck }) {
           {deck.description && (
             <p className="text-sm text-muted-foreground">{deck.description}</p>
           )}
+          {deck.generatedFrom && (
+            <p className="text-sm">
+              <span className="font-semibold">✨ AI prompt:</span>{" "}
+              {deck.generatedFrom}
+            </p>
+          )}
           <p className="text-xs font-bold text-muted-foreground">
             {deck.cards.length} cards · played {deck.playCount} times ·{" "}
             {deck.reports.length} open{" "}
@@ -224,6 +230,9 @@ function AdminDeckCard({ deck }: { deck: AdminDeck }) {
                 />
               )}
               {c.label}
+              {c.ai && (
+                <span className="text-xs text-muted-foreground">(AI)</span>
+              )}
             </li>
           ))}
         </ul>

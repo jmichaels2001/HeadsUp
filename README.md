@@ -28,7 +28,7 @@ private window, or a phone). Two tabs in the same profile share a seat.
 1. In the Supabase dashboard, open **SQL Editor** and run each file in
    `supabase/migrations/` once, in order (`0001_rooms.sql`, then
    `0002_decks.sql`, which also creates the public `card-images` storage
-   bucket, then `0003_reports.sql`).
+   bucket, then `0003_reports.sql` and `0004_ai_decks.sql`).
 2. Under **Project Settings → API Keys**, copy the project URL, the
    **publishable** key, and a **secret** key into `.env.local`:
    `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
@@ -71,6 +71,14 @@ Reported decks are reviewed at `/admin`. Set `ADMIN_SECRET` (server only) in
 `.env.local` and in Vercel, then sign in at `/admin` with it. Without it,
 `/admin` is off. Decks reported from 3 different browsers are hidden from the
 library automatically until you dismiss the reports or unhide them.
+
+## AI-generated decks
+
+Optional. Set `ANTHROPIC_API_KEY` (server only) in `.env.local` and in Vercel
+to turn on the Generate tab and `/decks/generate`. Decks are written by
+`claude-haiku-5-5` unless `ANTHROPIC_MODEL` says otherwise. AI decks are blind:
+nobody sees their cards, so everyone, including whoever generated it, can be
+dealt them. Each browser can generate 10 decks an hour.
 
 ## Commands
 

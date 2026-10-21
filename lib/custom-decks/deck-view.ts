@@ -11,6 +11,8 @@ export interface DeckRecord {
   version: number
   playCount: number
   hidden: boolean
+  /** The prompt an AI deck was generated from; null for hand-made decks. */
+  generatedFrom: string | null
   createdAt: number
   updatedAt: number
 }
@@ -20,7 +22,8 @@ export interface CardRecord {
   deckId: string
   label: string
   imageUrl: string | null
-  createdBy: string
+  /** Device that added it; null for AI cards, which nobody has seen. */
+  createdBy: string | null
   createdAt: number
 }
 
@@ -29,8 +32,24 @@ export function toCard(record: CardRecord): Card {
     id: record.id,
     label: record.label,
     ...(record.imageUrl && { imageUrl: record.imageUrl }),
-    creators: [record.createdBy],
+    creators: record.createdBy ? [record.createdBy] : [],
   }
+}
+
+/**
+ * Deleting a deck must not destroy cards someone else made and can't see.
+ * AI cards count as the deck creator's here, so they can delete an AI deck.
+ */
+export function canDeleteDeck(
+  deck: DeckRecord,
+  cards: CardRecord[],
+  deviceId: string,
+): boolean {
+  return cards.every(
+    (c) =>
+      c.createdBy === deviceId ||
+      (c.createdBy === null && deck.createdBy === deviceId),
+  )
 }
 
 /**
@@ -52,11 +71,15 @@ export function getDeckView(
     description: deck.description,
     version: deck.version,
     myCards: mine.map(toCard),
-    otherCardCount: cards.length - mine.length,
+    otherCardCount: cards.filter(
+      (c) => c.createdBy !== null && c.createdBy !== deviceId,
+    ).length,
+    aiCardCount: cards.filter((c) => c.createdBy === null).length,
     totalCardCount: cards.length,
     playable: isPlayable(cards.length),
-    canDelete: mine.length === cards.length,
+    canDelete: canDeleteDeck(deck, cards, deviceId),
     hidden: deck.hidden,
+    ai: deck.generatedFrom !== null,
   }
 }
 
@@ -71,10 +94,10 @@ export function mergeDuplicateCards(cards: CardRecord[]): Card[] {
     const key = normalizeLabel(record.label)
     const existing = merged.get(key)
     if (!existing) {
-      merged.set(key, { ...toCard(record), creators: [record.createdBy] })
+      merged.set(key, { ...toCard(record) } as Card & { creators: string[] })
       continue
     }
-    if (!existing.creators.includes(record.createdBy)) {
+    if (record.createdBy && !existing.creators.includes(record.createdBy)) {
       existing.creators.push(record.createdBy)
     }
     if (!existing.imageUrl && record.imageUrl) {

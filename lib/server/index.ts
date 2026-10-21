@@ -3,13 +3,19 @@ import "server-only"
 import { createClient } from "@supabase/supabase-js"
 
 import { AdminService } from "./admin-service"
+import { claudeDeckGenerator, DEFAULT_AI_MODEL } from "./ai-deck"
 import { DeckService } from "./deck-service"
 import { MemoryDeckStore, type DeckStore } from "./deck-store"
 import { MemoryImageStore, SupabaseImageStore } from "./image-store"
 import { RoomService, type VideoConfig } from "./room-service"
-import { MemoryRoomStore } from "./store"
+import { MemoryGenerationLog, type GenerationLog } from "./generation-log"
 import { MemoryReportStore, type ReportStore } from "./report-store"
-import { SupabaseDeckStore, SupabaseReportStore } from "./supabase-deck-store"
+import { MemoryRoomStore } from "./store"
+import {
+  SupabaseDeckStore,
+  SupabaseGenerationLog,
+  SupabaseReportStore,
+} from "./supabase-deck-store"
 import { SupabaseRoomStore, supabaseNotifier } from "./supabase-store"
 
 export { RoomError } from "./room-service"
@@ -18,7 +24,7 @@ const globalForRooms = globalThis as unknown as {
   headbandsRoomService?: RoomService
   headbandsDeckService?: DeckService
   headbandsAdminService?: AdminService
-  headbandsDeckStores?: { decks: DeckStore; reports: ReportStore }
+  headbandsDeckStores?: DeckStores
   headbandsMemoryImages?: MemoryImageStore
 }
 
@@ -65,11 +71,19 @@ export function getDeckService(): DeckService {
   }
 
   const db = supabaseAdmin()
-  const { decks, reports } = getDeckStores()
+  const { decks, reports, generations } = getDeckStores()
+  const apiKey = process.env.ANTHROPIC_API_KEY
   const service = new DeckService({
     store: decks,
     reports,
+    generations,
     images: db ? new SupabaseImageStore(db) : getMemoryImages(),
+    generator: apiKey
+      ? claudeDeckGenerator({
+          apiKey,
+          model: process.env.ANTHROPIC_MODEL || DEFAULT_AI_MODEL,
+        })
+      : null,
   })
   globalForRooms.headbandsDeckService = service
   return service
@@ -84,20 +98,31 @@ export function getAdminService(): AdminService {
   return globalForRooms.headbandsAdminService
 }
 
+interface DeckStores {
+  decks: DeckStore
+  reports: ReportStore
+  generations: GenerationLog
+}
+
 /** Shared by the deck and admin services, so memory mode sees one world. */
-function getDeckStores() {
+function getDeckStores(): DeckStores {
   if (globalForRooms.headbandsDeckStores) {
     return globalForRooms.headbandsDeckStores
   }
   const db = supabaseAdmin()
-  let stores: { decks: DeckStore; reports: ReportStore }
+  let stores: DeckStores
   if (db) {
     stores = {
       decks: new SupabaseDeckStore(db),
       reports: new SupabaseReportStore(db),
+      generations: new SupabaseGenerationLog(db),
     }
   } else if (process.env.NODE_ENV !== "production") {
-    stores = { decks: new MemoryDeckStore(), reports: new MemoryReportStore() }
+    stores = {
+      decks: new MemoryDeckStore(),
+      reports: new MemoryReportStore(),
+      generations: new MemoryGenerationLog(),
+    }
   } else {
     throw notConfigured()
   }

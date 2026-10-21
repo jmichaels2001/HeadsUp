@@ -58,9 +58,15 @@ export class AdminService {
           description: deck.description,
           hidden: deck.hidden,
           playCount: deck.playCount,
+          generatedFrom: deck.generatedFrom,
           cards: cards
             .sort((a, b) => a.createdAt - b.createdAt)
-            .map((c) => ({ id: c.id, label: c.label, imageUrl: c.imageUrl })),
+            .map((c) => ({
+              id: c.id,
+              label: c.label,
+              imageUrl: c.imageUrl,
+              ai: c.createdBy === null,
+            })),
           reports: open
             .filter((r) => r.deckId === deck.id)
             .map((r) => ({

@@ -42,6 +42,8 @@ export class RoomError extends Error {
         return 401
       case "invalid":
         return 400
+      case "rateLimited":
+        return 429
       case "unavailable":
         return 503
       default:
